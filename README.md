@@ -7,7 +7,7 @@ cli
 
 I was tired of searching for a decent alternative to argparse that was both
 easy to use and allowed for sub-arguments with all the power I wanted. So
-instead i re-built an [existing-library](https://github.com/urfave/cli) from [golang](https://golang.org/)
+instead I re-built an [existing-library](https://github.com/urfave/cli) from [golang](https://golang.org/)
 and wrote it in python with most of the same features. ENJOY!! - Imgurbot12
 
 P.S. This library took HEAVY inspiration from golang's third party library:
