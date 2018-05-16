@@ -46,8 +46,8 @@ organized, and expressive!
 
 ## Installation
 
-Make sure you have a working Go environment.  Go version 1.2+ is supported.  [See
-the install instructions for Go](http://golang.org/doc/install.html).
+Make sure you have a working Python environment.  Python version 2.7.6+ is supported.  [See
+the install instructions for Python](https://docs.python.org/3/using/index.html).
 
 To install cli, simply run:
 ```
