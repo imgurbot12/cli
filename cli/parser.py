@@ -131,6 +131,10 @@ class ArgumentParser:
         self._run_commands(context, values[sub_index:])
         return True
 
+    def run_commands(self, context):
+        """run commands after context and values are built using run command"""
+        return self._run_commands(context, self.values)
+
     def run(self, values):
         """
         collect data from values and parse into
@@ -152,11 +156,9 @@ class ArgumentParser:
         self.app.before(context)
         self.app.action(context)
         self.app.after(context)
-        # attempt to collect commands and their subsequent flags
-        # if no commands were found: print help page
-        if not self._run_commands(context, values):
-            show_app_help(context)
-            raise SystemExit(0)
+        # save values for run_commands
+        self.values = values
+
 
 
 

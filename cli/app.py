@@ -112,8 +112,14 @@ class App:
         pass
 
     def action(self, context):
-        pass
+        """
+        attempt to collect commands and their subsequent flags
+        if no commands were found: print help page
+        """
+        if not self.parser.run_commands():
+            show_app_help(context)
+            raise SystemExit(0)
 
     def run(self, args):
-        parser = ArgumentParser(self)
-        parser.run(args[1:])
+        self.parser = ArgumentParser(self)
+        self.parser.run(args[1:])
