@@ -5,15 +5,19 @@ class Args(list):
 
     def get(self, index):
         """return n-th argument in args"""
-        return self[index]
+        if len(self) > index:
+            return self[index]
+        return ""
 
     def first(self):
         """return 1st argument in args"""
-        return self[0]
+        return self.get(0)
 
     def tail(self):
         """return all arguments but first"""
-        return self[1:]
+        if len(self) >= 2:
+            return self[1:]
+        return self
 
     def present(self):
         """return true if there are any arguments"""
