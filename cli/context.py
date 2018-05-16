@@ -133,6 +133,6 @@ class GlobalContext(Context):
     ArgumentParser to use to parse all incoming arguments
     """
 
-    def __init__(self, app, global_flags):
+    def __init__(self, app, global_flags, args):
         command = Command("", subcommands=app.commands)
-        super(GlobalContext, self).__init__(app, global_flags, None, command, None, [])
+        super(GlobalContext, self).__init__(app, global_flags, None, command, None, args)

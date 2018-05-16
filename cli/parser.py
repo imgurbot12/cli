@@ -144,7 +144,7 @@ class ArgumentParser:
         # get global flags and update values
         global_flags, values = self._get_flags(None, self.app.flags, values)
         # create base context as place-holder
-        context = GlobalContext(self.app, global_flags)
+        context = GlobalContext(self.app, global_flags, values)
         # check if builtin help or version flag exists
         if global_flags['help']:
             show_app_help(context)
