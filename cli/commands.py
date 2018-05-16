@@ -34,7 +34,7 @@ class Command:
                  aliases=[],
                  usage="",
                  argsusage="",
-                 category=" ",
+                 category="none",
                  hidden=False,
                  flags=[],
                  subcommands=[],

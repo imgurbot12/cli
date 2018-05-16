@@ -19,10 +19,10 @@ DESCRIPTION:
 AUTHOR{%if authors|length > 1%}S{%endif%}:{% for author in authors %}
     {{author}}{%endfor%}{%endif%}{%if visible_commands%}
 
-COMMANDS:{%for category in visible_categories%}{%if category%}
+COMMANDS:{%for category in visible_categories%}{%if category and category != "none"%}
 
-    {{category}}:{%endif%}{% for cmd in visible_commands%}
-      {{", ".join(cmd.names())}}{{"\t"}}{{cmd.usage}}{%endfor%}{%endfor%}{%endif%}{%if visible_flags%}
+    {{category}}:{%endif%}{% for cmd in visible_commands%}{%if cmd.category == category%}
+      {{", ".join(cmd.names())}}{{"\t"}}{{cmd.usage}}{%endif%}{%endfor%}{%endfor%}{%endif%}{%if visible_flags%}
       
 GLOBAL OPTIONS:{%for flag in visible_flags%}
     {{flag}}{{"\t"}}{{flag.usage}}{%endfor%}{%endif%}{%if copyright%}

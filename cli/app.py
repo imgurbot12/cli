@@ -79,7 +79,7 @@ class App:
 
     def visible_categories(self):
         """return category names for each category"""
-        return [category.strip() for category in self.categories.keys()]
+        return [category for category in self.categories.keys()]
 
     def visible_commands(self):
         """return commands that are not hidden"""
