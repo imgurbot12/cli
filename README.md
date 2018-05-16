@@ -51,7 +51,7 @@ the install instructions for Python](https://docs.python.org/3/using/index.html)
 
 To install cli, simply run:
 ```
-$ pip install cli
+$ pip install git+https://github.com/imgurbot12/cli
 ```
 
 ### Supported platforms
