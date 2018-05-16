@@ -139,4 +139,4 @@ class GlobalContext(Context):
 
     def __init__(self, app, global_flags, args):
         command = Command("", subcommands=app.commands)
-        super(GlobalContext, self).__init__(app, global_flags, None, command, None, args)
+        super(GlobalContext, self).__init__(app, global_flags, None, command, global_flags, args)

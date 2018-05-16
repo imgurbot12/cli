@@ -4,7 +4,7 @@ from .commands import Command
 from jinja2 import Template
 
 #** Variables **#
-_default_app_help = """NAME:
+default_app_help = """NAME:
     {{name}}{%if usage%} - {{usage}}{%endif%}
     
 USAGE:
@@ -31,7 +31,7 @@ COPYRIGHT:
     {{copyright}}{%endif%}          
 """
 
-_default_subcmd_help = """NAME:
+default_cmd_help = """NAME:
     {{name}} - {%if description%}{{description}}{%else%}{{usage}}{%endif%}
 
 USAGE:
@@ -94,7 +94,7 @@ def show_app_help(context):
     allvars = _get_app_args(context.app)
     if context.app.help_template is not None:
         template = Template(context.app.help_template)
-    else: template = Template(_default_app_help)
+    else: template = Template(default_app_help)
     # write output
     print(template.render(**allvars), file=context.app.writer)
 
@@ -105,7 +105,7 @@ def show_cmd_help(context, command_str):
     # determine template object
     if context.app.cmd_help_template is not None:
         template = Template(context.app.cmd_help_template)
-    else: template = Template(_default_subcmd_help)
+    else: template = Template(default_cmd_help)
     # print default if command-str is empty
     if command_str == "":
         allvars = _get_app_args(context.app)
