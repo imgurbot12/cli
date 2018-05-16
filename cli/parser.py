@@ -142,9 +142,9 @@ class ArgumentParser:
         adding them to context object and running commands recursively
         """
         # get global flags and update values
-        global_flags, values = self._get_flags(None, self.app.flags, values)
+        global_flags, self.values = self._get_flags(None, self.app.flags, values)
         # create base context as place-holder
-        context = GlobalContext(self.app, global_flags, values)
+        context = GlobalContext(self.app, global_flags, self.values)
         # check if builtin help or version flag exists
         if global_flags['help']:
             show_app_help(context)
@@ -156,8 +156,6 @@ class ArgumentParser:
         self.app.before(context)
         self.app.action(context)
         self.app.after(context)
-        # save values for run_commands
-        self.values = values
 
 
 

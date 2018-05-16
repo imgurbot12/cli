@@ -116,7 +116,7 @@ class App:
         attempt to collect commands and their subsequent flags
         if no commands were found: print help page
         """
-        if not self.parser.run_commands():
+        if not self.parser.run_commands(context):
             show_app_help(context)
             raise SystemExit(0)
 
