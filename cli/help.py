@@ -35,7 +35,7 @@ default_cmd_help = """NAME:
     {{name}} - {%if description%}{{description}}{%else%}{{usage}}{%endif%}
 
 USAGE:
-    {{name}} command{%if visible_flags%} [command options]{%endif%} {%if argsusage%}{argsusage}{%else%}[arguments...]{%endif%}
+    {{name}} command{%if visible_flags%} [command options]{%endif%} {%if argsusage%}{{argsusage}}{%else%}[arguments...]{%endif%}
 
 {%if is_command%}SUB{%endif%}COMMANDS:{%for category in visible_categories%}{%if category.name%}
     {{category.name}}:{%endif%}{%for cmd in visible_commands%}
