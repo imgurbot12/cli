@@ -39,7 +39,7 @@ USAGE:
 
 {%if is_command%}SUB{%endif%}COMMANDS:{%for category in visible_categories%}{%if category.name%}
     {{category.name}}:{%endif%}{%for cmd in visible_commands%}
-      {{", ".join(cmd.names())}}{{"\t"}}{{usage}}{%endfor%}{%endfor%}{%if visible_flags%}
+      {{", ".join(cmd.names())}}{{"\t"}}{{cmd.usage}}{%endfor%}{%endfor%}{%if visible_flags%}
 
 OPTIONS:{%for flag in visible_flags%}
     {{flag}}{{"\t"}}{{flag.usage}}{%endfor%}{%endif%}
