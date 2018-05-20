@@ -118,7 +118,6 @@ class App:
         """
         if not self.parser.run_commands(context):
             show_app_help(context)
-            raise SystemExit(0)
 
     def run(self, args):
         self.parser = ArgumentParser(self)
