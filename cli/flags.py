@@ -92,7 +92,7 @@ class ListFlag(TypeFlag):
 class DurationFlag(TypeFlag):
 
     def __init__(self, name, usage="", default=None, hidden=False):
-        super(DurationFlag, self).__init__(name, str, usage=usage, default=default, hidden=hidden)
+        super(DurationFlag, self).__init__(name, int, usage=usage, default=default, hidden=hidden)
 
     def _parse(self, time_str):
         """parse raw time-string into time-delta object before returning seconds"""
