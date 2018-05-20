@@ -92,18 +92,17 @@ class ListFlag(TypeFlag):
 class DurationFlag(TypeFlag):
 
     def __init__(self, name, usage="", default=None, hidden=False):
+        if isinstance(default, str): default = self._parse(default) # if default is string, parse into duration
         super(DurationFlag, self).__init__(name, int, usage=usage, default=default, hidden=hidden)
 
     def _parse(self, time_str):
         """parse raw time-string into time-delta object before returning seconds"""
         parts = _dtregex.match(time_str)
-        if not parts: return
+        if not parts: return False
         return timedelta(**{k: int(v) for k, v in parts.groupdict().items() if v}).seconds
 
     def convert(self, string):
         """convert raw time-delta string into number of seconds"""
         try:
-            secs = self._parse(string)
-            if secs == 0: return False
-            return secs
+            return self._parse(string)
         except: return False
