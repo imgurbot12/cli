@@ -28,19 +28,20 @@ class ArgumentParser:
             {},
             {name:flag.names[0] for flag in self.app.flags for name in flag.names}, # all global flag names
             self.app.commands,
-            "app"
+            "app",
         )
 
-    def _validate(self, command_names, flag_names, commands, cmd_path):
+    def _validate(self, cmd_names, flag_names, commands, cmd_path):
         """recursively iterate commands and flags to ensure that no command names or flags are overlapping"""
         # check if command names are already in use
-        for cmd in commands:
+        for i, cmd in enumerate(commands, 0):
             for name in cmd.names():
-                if name in command_names:
+                if name in cmd_names:
                     self.app.exit_with_error(
-                        '{0}->{1}->command: "{2}", name: {3} in use by: "{4}"!'.format(
-                            cmd_path, cmd.name, ", ".join(cmd.names()), name, command_names[name]), 2)
-                else: command_names[name] = cmd.name
+                        '{0}->{1}: "{2}", name: {3} in use by: "{4}"!'.format(
+                            cmd_path, cmd.name+"["+str(i)+"]", ", ".join(cmd.names()), name, cmd_names[name]), 2)
+                else:
+                    cmd_names[name] = cmd_path+"->"+cmd.name+"["+str(i)+"]"
                 # check if command flag names are already in use
                 for flag in cmd.flags:
                     for name in flag.names:
@@ -48,9 +49,11 @@ class ArgumentParser:
                             self.app.exit_with_error(
                                 '{0}->{1}->flag: "{2}", name: "{3}" in use by: "{4}"!'.format(
                                     cmd_path, cmd.name, flag, name, flag_names[name]), 2)
-                        else: flag_names[name] = flag.names[0]
+                        else:
+                            flag_names[name] = flag.names[0]
             # run recursively for sub-commands and their flags
-            self._validate(command_names, flag_names, cmd.subcommands, cmd_path+"->"+cmd.name)
+            self._validate(cmd_names.copy(), flag_names, cmd.subcommands, cmd_path + "->" + cmd.name)
+
 
     def _get_flags(self, context, flags, values):
         """
