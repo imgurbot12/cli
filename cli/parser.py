@@ -159,10 +159,3 @@ class ArgumentParser:
         self.app.before(context)
         self.app.action(context)
         self.app.after(context)
-
-
-
-
-
-
-
