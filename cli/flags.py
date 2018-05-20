@@ -1,3 +1,8 @@
+import re
+from datetime import timedelta
+
+#** Variables **#
+_dtregex = re.compile(r'((?P<hours>\d+?)hr)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
 
 #** Function **#
 
@@ -83,3 +88,22 @@ class ListFlag(TypeFlag):
 
     def __init__(self, name, usage="", default=None, hidden=False):
         super(ListFlag, self).__init__(name, list, usage=usage, default=default, hidden=hidden)
+
+class DurationFlag(TypeFlag):
+
+    def __init__(self, name, usage="", default=None, hidden=False):
+        super(DurationFlag, self).__init__(name, str, usage=usage, default=default, hidden=hidden)
+
+    def _parse(self, time_str):
+        """parse raw time-string into time-delta object before returning seconds"""
+        parts = _dtregex.match(time_str)
+        if not parts: return
+        return timedelta(**{k: int(v) for k, v in parts.groupdict().items() if v}).seconds
+
+    def convert(self, string):
+        """convert raw time-delta string into number of seconds"""
+        try:
+            secs = self._parse(string)
+            if secs == 0: return False
+            return secs
+        except: return False
