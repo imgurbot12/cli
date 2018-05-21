@@ -92,10 +92,14 @@ class Command:
         pass
 
     def action(self, context):
-        pass
+        """default action is to show help page"""
+        show_cmd_help(context, self.name)
 
     def run(self, context):
         """run command and pass context object"""
         self.before(context)
         self.action(context)
         self.before(context)
+
+# lazy import to avoid circular importation
+from .help import show_cmd_help
