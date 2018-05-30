@@ -120,5 +120,5 @@ def show_cmd_help(context, command_str):
     # run error if no command available
     context.app.not_found_error(context, command_str)
 
-
-
+#TODO: need command's default action to be help page without getting in the way of sub-commands if they exist
+#TODO: need help to be available for recusrsive sub-commands, (commands past first set of sub-commands)
