@@ -52,7 +52,7 @@ class ArgumentParser:
                         else:
                             flag_names[name] = flag.names[0]
             # run recursively for sub-commands and their flags
-            self._validate(cmd_names.copy(), flag_names, cmd.subcommands, cmd_path + "->" + cmd.name)
+            self._validate(cmd_names.copy(), flag_names.copy(), cmd.subcommands, cmd_path + "->" + cmd.name)
 
 
     def _get_flags(self, context, flags, values):
