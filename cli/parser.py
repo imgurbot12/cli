@@ -49,8 +49,8 @@ class ArgumentParser:
         parses the list of values for a dictionary object containing all of the flags used
         returns updated list of values along with flags
         """
-        indexes = []   # list of indexes to delete from values
-        collected = {} # dict of flags that were collected from values
+        indexes = []    # list of indexes to delete from values
+        collected = {}  # dict of flags that were collected from values
         # list only flags but keep length and placement the same to check for flag matches
         only_flags = [word.lstrip("-") if word.startswith('-') else '' for word in values]
         # iterate flags attempting to index and collect values for each flag
@@ -58,18 +58,23 @@ class ArgumentParser:
             index = flag.index(only_flags)
             if index > -1:
                 indexes.append(index)
+                # ensure flag does not appear twice
+                if flag.index(only_flags[index+1:]) > -1:
+                    self.app.on_usage_error(context, 'Flag: %r is repeated!' % ", ".join(flag.names),
+                                            context is not None)
                 # add flag=value if present else add flag=true
                 if flag.has_value:
                     # check that value actually exists after flag
                     if index+1 >= len(values):
                         self.app.on_usage_error(context,
-                            "Flag: %s requires value! (type=%r)" % (", ".join(flag.names), flag.__class__.__name__), 1)
+                                                "Flag: %r requires value! (type=%r)" %
+                                                (", ".join(flag.names), flag.__class__.__name__), context is not None)
                     value = flag.convert(values[index+1])
                     if not value:
                         self.app.exit_with_error("%s decode value failure: %r" % (flag, values[index+1]), 1)
                     # append value to collected flags
                     collected[flag.names[0]] = value
-                    indexes.append(index+1) # append value's index to delete as well
+                    indexes.append(index+1)  # append value's index to delete as well
                 else:
                     collected[flag.names[0]] = True
             # add in default value if has one
@@ -97,6 +102,10 @@ class ArgumentParser:
                 break
         # check if any commands found
         if command is None:
+            # check for any invalid flags
+            for value in values:
+                if value.startswith("-"):
+                    self.app.on_usage_error(context, "flag provided but not defined: %s" % value, context is not None)
             return False
         # attempt to collect flags for command
         flags, values = self._get_flags(context, command.flags, values)
@@ -121,7 +130,7 @@ class ArgumentParser:
                 self.app.on_usage_error(context, "flag provided but not defined: %s" % arg, context is not None)
         # create new context object and run command action
         context = Context(context.app, context.dictionary['global-flags'], context, command, flags, args)
-        command.run(context) # run command's action with context
+        command.run(context)  # run command's action with context
         # iterate again for commands sub-commands if available
         self._run_commands(context, values[sub_index:])
         return True
