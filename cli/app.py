@@ -1,7 +1,7 @@
 from __future__ import print_function
+from .parser import ArgumentParser
 from .flags import _assert_flags, BoolFlag
 from .commands import _assert_calls, _assert_commands
-from .parser import ArgumentParser
 from .help import helpFlag, helpCommand, show_app_help, show_cmd_help
 import sys
 
