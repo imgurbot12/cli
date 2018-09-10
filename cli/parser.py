@@ -1,17 +1,6 @@
 from __future__ import print_function
 from .context import Context, GlobalContext
 from .help import show_app_help
-from functools import reduce
-
-#** Functions **#
-
-def _get_dict(dictionary, mapList):
-    """get value from nested dictionary using list of keys as path"""
-    return reduce(lambda d, k: d[k], mapList, dictionary)
-
-def _set_dict(dictionary, mapList, value):
-    """set value into nested dictionary using list of keys as path"""
-    _get_dict(dictionary, mapList[:-1])[mapList[-1]] = value
 
 #** Classes **#
 class ArgumentParser:
@@ -24,6 +13,7 @@ class ArgumentParser:
 
     def __init__(self, app):
         self.app = app
+        self.values = []
         self._validate(
             {},
             {name:flag.names[0] for flag in self.app.flags for name in flag.names}, # all global flag names
@@ -44,16 +34,15 @@ class ArgumentParser:
                     cmd_names[name] = cmd_path+"->"+cmd.name+"["+str(i)+"]"
                 # check if command flag names are already in use
                 for flag in cmd.flags:
-                    for name in flag.names:
-                        if name in flag_names:
+                    for fname in flag.names:
+                        if fname in flag_names:
                             self.app.exit_with_error(
                                 '{0}->{1}->flag: "{2}", name: "{3}" in use by: "{4}"!'.format(
-                                    cmd_path, cmd.name, flag, name, flag_names[name]), 2)
+                                    cmd_path, cmd.name, flag, fname, flag_names[fname]), 2)
                         else:
-                            flag_names[name] = flag.names[0]
+                            flag_names[fname] = flag.names[0]
             # run recursively for sub-commands and their flags
             self._validate(cmd_names.copy(), flag_names.copy(), cmd.subcommands, cmd_path + "->" + cmd.name)
-
 
     def _get_flags(self, context, flags, values):
         """
@@ -107,14 +96,17 @@ class ArgumentParser:
                 command_name = found_cmd
                 break
         # check if any commands found
-        if command is None: return False
+        if command is None:
+            return False
         # attempt to collect flags for command
         flags, values = self._get_flags(context, command.flags, values)
         # check for out of place arguments in values
-        if values.index(command_name) != 0:
+        cmd_index = values.index(command_name)
+        if cmd_index != 0:
             if values[0].startswith("-"):
                 self.app.on_usage_error(context, "flag provided but not defined: %s" % values[0], context is not None)
-            else: self.app.not_found_error(context, values[0])
+            else:
+                self.app.not_found_error(context, values[0])
         # collect arguments for command before any sub-commands
         sub_index = len(values)
         for cmd in command.subcommands:
