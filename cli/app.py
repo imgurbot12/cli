@@ -97,8 +97,10 @@ class App:
     def on_usage_error(self, context, error, isSubCmd):
         """default error handler for command-usage-error"""
         print("Incorrect Usage: %s\n" % error, file=self.writer)
-        if isSubCmd: show_cmd_help(context, context.command.name)
-        else: show_app_help(context)
+        if isSubCmd:
+            show_cmd_help(context, context.command)
+        else:
+            show_app_help(self)
         raise SystemExit(4)
 
     def exit_with_error(self, error, exitcode):
@@ -117,7 +119,7 @@ class App:
         if no commands were found: print help page
         """
         if not self.parser.run_commands(context):
-            show_app_help(context)
+            show_app_help(context.app)
 
     def run(self, args):
         self.parser = ArgumentParser(self)

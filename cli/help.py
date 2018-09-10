@@ -18,7 +18,7 @@ DESCRIPTION:
     
 AUTHOR{%if authors|length > 1%}S{%endif%}:{% for author in authors %}
     {{author}}{%endfor%}{%endif%}{%if visible_commands%}
-
+    
 COMMANDS:{%for category in visible_categories%}{%if category and category != "none"%}
 
     {{category}}:{%endif%}{% for cmd in visible_commands%}{%if cmd.category == category%}
@@ -33,14 +33,14 @@ COPYRIGHT:
 
 default_cmd_help = """NAME:
     {{name}} - {%if description%}{{description}}{%else%}{{usage}}{%endif%}
-
+    
 USAGE:
     {{name}} command{%if visible_flags%} [command options]{%endif%} {%if argsusage%}{{argsusage}}{%else%}[arguments...]{%endif%}
-
+    
 {%if is_command%}SUB{%endif%}COMMANDS:{%for category in visible_categories%}{%if category.name%}
     {{category.name}}:{%endif%}{%for cmd in visible_commands%}
       {{", ".join(cmd.names())}}{{"\t"}}{{cmd.usage}}{%endfor%}{%endfor%}{%if visible_flags%}
-
+    
 OPTIONS:{%for flag in visible_flags%}
     {{flag}}{{"\t"}}{{flag.usage}}{%endfor%}{%endif%}
 """
@@ -102,16 +102,16 @@ def _get_cmd_args(command):
         allvars["visible_categories"] = command.visible_categories()
     return allvars
 
-def show_app_help(context):
+def show_app_help(app):
     """
     build main help page using app variables and given template in app
     """
-    allvars = _get_app_args(context.app)
-    if context.app.help_template is not None:
-        template = Template(context.app.help_template)
+    allvars = _get_app_args(app)
+    if app.help_template is not None:
+        template = Template(app.help_template)
     else: template = Template(default_app_help)
     # write output
-    print(template.render(**allvars), file=context.app.writer)
+    print(template.render(**allvars), file=app.writer)
 
 def show_cmd_help(context, command):
     """
@@ -121,9 +121,12 @@ def show_cmd_help(context, command):
     if context.app.cmd_help_template is not None:
         template = Template(context.app.cmd_help_template)
     else: template = Template(default_cmd_help)
+    # if command is global-command, print base help
+    if command.name == '':
+        show_app_help(context.app)
+        return
     # print command help after retrieving arguments
     allvars = _get_cmd_args(command)
     print(template.render(**allvars), file=context.app.writer)
 
 #TODO: need command's default action to be help page without getting in the way of sub-commands if they exist
-#TODO: need help to be available for recusrsive sub-commands, (commands past first set of sub-commands)
