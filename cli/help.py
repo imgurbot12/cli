@@ -51,7 +51,22 @@ def _helpCommandAction(context):
     """action for helpCommand object"""
     args = context.args()
     if args.present():
-        return show_cmd_help(context, args.first())
+        # iterate arguments until the last sub-cmd has been found
+        argpath = ''
+        subcommand = None
+        commands = context.app.commands
+        for arg in args:
+            found = False
+            for cmd in commands:
+                if cmd.has_name(arg):
+                    argpath += arg+'->'
+                    commands, subcommand, found = cmd.subcommands, cmd, True
+                    break
+            # error on invalid command for help attempt
+            if not found:
+                context.app.not_found_error(context, argpath+arg)
+        # show help page for last found sub-cmd
+        return show_cmd_help(context, subcommand)
     show_app_help(context)
 
 helpCommand = Command(
@@ -98,7 +113,7 @@ def show_app_help(context):
     # write output
     print(template.render(**allvars), file=context.app.writer)
 
-def show_cmd_help(context, command_str):
+def show_cmd_help(context, command):
     """
     build command help page using app/command variables and given template in app
     """
@@ -106,19 +121,9 @@ def show_cmd_help(context, command_str):
     if context.app.cmd_help_template is not None:
         template = Template(context.app.cmd_help_template)
     else: template = Template(default_cmd_help)
-    # print default if command-str is empty
-    if command_str == "":
-        allvars = _get_app_args(context.app)
-        print(template.render(**allvars), file=context.app.writer)
-        return
-    # iterate app-commands to find command-name
-    for cmd in context.app.commands:
-        if cmd.has_name(command_str):
-            allvars = _get_cmd_args(cmd)
-            print(template.render(**allvars), file=context.app.writer)
-            return
-    # run error if no command available
-    context.app.not_found_error(context, command_str)
+    # print command help after retrieving arguments
+    allvars = _get_cmd_args(command)
+    print(template.render(**allvars), file=context.app.writer)
 
 #TODO: need command's default action to be help page without getting in the way of sub-commands if they exist
 #TODO: need help to be available for recusrsive sub-commands, (commands past first set of sub-commands)
