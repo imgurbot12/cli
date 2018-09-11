@@ -70,7 +70,7 @@ class ArgumentParser:
                                                 "Flag: %r requires value! (type=%r)" %
                                                 (", ".join(flag.names), flag.__class__.__name__), context is not None)
                     value = flag.convert(values[index+1])
-                    if not value:
+                    if value is False:
                         self.app.exit_with_error("%s decode value failure: %r" % (flag, values[index+1]), 1)
                     # append value to collected flags
                     collected[flag.names[0]] = value
