@@ -67,7 +67,7 @@ def _helpCommandAction(context):
                 context.app.not_found_error(context, argpath+arg)
         # show help page for last found sub-cmd
         return show_cmd_help(context, subcommand)
-    show_app_help(context)
+    show_app_help(context.app)
 
 helpCommand = Command(
     name="help",
