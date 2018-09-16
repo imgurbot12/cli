@@ -151,7 +151,7 @@ class ArgumentParser:
         context = GlobalContext(self.app, global_flags, self.values)
         # check if builtin help or version flag exists
         if global_flags['help']:
-            show_app_help(context)
+            show_app_help(context.app)
             raise SystemExit(0)
         if global_flags['version']:
             print("%s version %s" % (context.app.name, context.app.version), file=context.app.writer)
