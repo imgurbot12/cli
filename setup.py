@@ -8,5 +8,8 @@ setup(
     license='MIT License',
     author='imgurbot12',
     author_email='',
-    description='A simple, fast, and fun package for building command line apps in Python'
+    description='A simple, fast, and fun package for building command line apps in Python',
+    requirements=[
+        'jinja2',
+    ]
 )
