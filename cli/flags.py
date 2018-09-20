@@ -36,7 +36,8 @@ class TypeFlag(object):
         self.usage = usage
         self.default = default
         self.hidden = hidden
-        self.has_value = True # true if flag-type has value to collect from args on input
+        self._builtin = False  # true if flag is built-into the app by default
+        self.has_value = True  # true if flag-type has value to collect from args on input
         if default is not None:
             assert(isinstance(default, type))
 
@@ -67,7 +68,7 @@ class BoolFlag(TypeFlag):
 
     def __init__(self, name, usage="", default=False, hidden=False):
         super(BoolFlag, self).__init__(name, int, usage=usage, default=default, hidden=hidden)
-        self.has_value = False # bool-flag type has no set value at end of flag
+        self.has_value = False  # bool-flag type has no set value at end of flag
 
 class IntFlag(TypeFlag):
 
