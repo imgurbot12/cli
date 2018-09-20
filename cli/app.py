@@ -7,6 +7,7 @@ import sys
 
 #** Variables **#
 versionFlag = BoolFlag(name="version, v", usage="print the version")
+versionFlag._builtin = True
 
 #** Classes **#
 class App:
@@ -87,7 +88,7 @@ class App:
 
     def visible_flags(self):
         """return flags that are not hidden"""
-        return [flag for flag in self.flags if not flag.hidden]
+        return [flag for flag in self.flags if not flag.hidden and not flag._builtin]
 
     def not_found_error(self, context, command):
         """default error handler for command-not-found"""
