@@ -9,7 +9,7 @@ setup(
     author='imgurbot12',
     author_email='',
     description='A simple, fast, and fun package for building command line apps in Python',
-    requirements=[
+    install_requires=[
         'jinja2',
     ]
 )
