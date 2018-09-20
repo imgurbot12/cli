@@ -13,7 +13,7 @@ and wrote it in python with most of the same features. ENJOY!! - Imgurbot12
 P.S. This library took HEAVY inspiration from golang's third party library:
 https://github.com/urfave/cli including this README. Go give them some love <3.
 
-cli is a simple, fast, and fun package for building command line apps in Go. The
+cli is a simple, fast, and fun package for building command line apps in Python. The
 goal is to enable developers to write fast and distributable command line
 applications in an expressive way.
 
