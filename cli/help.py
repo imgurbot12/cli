@@ -8,7 +8,7 @@ default_app_help = """NAME:
     {{name}}{%if usage%} - {{usage}}{%endif%}
     
 USAGE:
-    {%if visible_flags%}[global options]{%endif%}{%if commands%} command [command options]{%endif%} {%if argsusage%}{{argsusage}}{%endif%}[arguments...]
+    {%if visible_flags%}[global options]{%endif%}{%if commands%} command [command options]{%endif%} {%if argsusage%}{{argsusage}}{%else%}[arguments...]{%endif%}
     
 VERSION:
     {{version}}{%if description%}
@@ -47,6 +47,7 @@ OPTIONS:{%for flag in visible_flags%}
 """
 """
 
+
 def _helpCommandAction(context):
     """action for helpCommand object"""
     args = context.args()
@@ -69,6 +70,7 @@ def _helpCommandAction(context):
         return show_cmd_help(context, subcommand)
     show_app_help(context.app)
 
+
 helpCommand = Command(
     name="help",
     aliases=["h"],
@@ -78,6 +80,7 @@ helpCommand = Command(
 )
 
 helpFlag = BoolFlag(name="help", usage="\tshows a list of commands")
+helpFlag._builtin = True
 
 #** Functions **#
 
@@ -88,6 +91,7 @@ def _get_app_args(app):
     allvars["visible_commands"] = app.visible_commands()
     allvars["visible_categories"] = app.visible_categories()
     return allvars
+
 
 def _get_cmd_args(command):
     """return dictionary of all required command variable and function returns"""
@@ -102,6 +106,7 @@ def _get_cmd_args(command):
         allvars["visible_categories"] = command.visible_categories()
     return allvars
 
+
 def show_app_help(app):
     """
     build main help page using app variables and given template in app
@@ -112,6 +117,7 @@ def show_app_help(app):
     else: template = Template(default_app_help)
     # write output
     print(template.render(**allvars), file=app.writer)
+
 
 def show_cmd_help(context, command):
     """
