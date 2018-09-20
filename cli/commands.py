@@ -50,6 +50,7 @@ class Command:
         self.hidden = hidden
         self.flags = flags
         self.subcommands = subcommands
+        self._has_subarg = False  # internal use allows default action to tell if there is a sub-argument after it
         # ensure function objects are callable
         _assert_calls(self, action, beforeFunc, afterFunc)
         # check types on flags
@@ -92,7 +93,10 @@ class Command:
         pass
 
     def action(self, context):
-        pass
+        """default action is to show-command-help"""
+        if not self._has_subarg:
+            from .help import show_cmd_help
+            show_cmd_help(context, self)
 
     def run(self, context):
         """run command and pass context object"""

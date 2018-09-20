@@ -130,7 +130,8 @@ class ArgumentParser:
                 self.app.on_usage_error(context, "flag provided but not defined: %s" % arg, context is not None)
         # create new context object and run command action
         context = Context(context.app, context.dictionary['global-flags'], context, command, flags, args)
-        command.run(context)  # run command's action with context
+        command._has_subarg = values[sub_index:] != []  # tell command whether it has any sub-args
+        command.run(context)                            # run command's action with context
         # iterate again for commands sub-commands if available
         self._run_commands(context, values[sub_index:])
         return True
