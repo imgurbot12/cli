@@ -134,5 +134,3 @@ def show_cmd_help(context, command):
     # print command help after retrieving arguments
     allvars = _get_cmd_args(command)
     print(template.render(**allvars), file=context.app.writer)
-
-#TODO: need command's default action to be help page without getting in the way of sub-commands if they exist
