@@ -87,7 +87,7 @@ helpFlag._builtin = True
 def _get_app_args(app):
     """return dictionary of all required app variable and function returns"""
     allvars = vars(app).copy()
-    allvars["visible_flags"] = app.visible_flags()
+    allvars["visible_flags"] = [flag for flag in app.visible_flags() if not flag._builtin]
     allvars["visible_commands"] = app.visible_commands()
     allvars["visible_categories"] = app.visible_categories()
     return allvars

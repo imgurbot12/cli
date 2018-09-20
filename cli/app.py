@@ -88,7 +88,7 @@ class App:
 
     def visible_flags(self):
         """return flags that are not hidden"""
-        return [flag for flag in self.flags if not flag.hidden and not flag._builtin]
+        return [flag for flag in self.flags if not flag.hidden]
 
     def not_found_error(self, context, command):
         """default error handler for command-not-found"""
