@@ -156,21 +156,19 @@ for name, test in tests.items():
         app.run([sys.executable]+test['cmd'].split())
         # check if test was supposed to fail
         if test['fail']:
-            print('test succeeded unexpectedly: %r\nOutput:\n%s' % (name, _get_output(out)))
-            break
+            raise SystemExit('test succeeded unexpectedly: %r\nOutput:\n%s' % (name, _get_output(out)))
         else:
             output = _get_output(out)
             if test['expect'] not in output:
-                print('test: %r, missing expected normal output: %r\nOutput:\n%s' % (name, test['expect'], output))
-                break
+                raise SystemExit('test: %r, missing expected normal output: %r\nOutput:\n%s' % (
+                    name, test['expect'], output))
     except (Exception, BaseException):
         if not test['fail']:
-            print('test failed unexpectedly: %r\nOutput:\n%s' % (name, _get_output(out)))
-            break
+            raise SystemExit('test failed unexpectedly: %r\nOutput:\n%s' % (name, _get_output(out)))
         else:
             output = _get_output(out)
             if test['expect'] not in output:
-                print('test: %r, missing expected failure output: %r\nOutput:\n%s' % (name, test['expect'], output))
-                break
+                raise SystemExit('test: %r, missing expected failure output: %r\nOutput:\n%s' % (
+                    name, test['expect'], output))
 
 print('All Tests Verified! Working!')
