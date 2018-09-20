@@ -5,6 +5,8 @@ cli
 [![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
 [![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
 
+WARNING: This repo is now a mirror of: https://gitlab.com/imgurbot12/cli
+
 I was tired of searching for a decent alternative to argparse that was both
 easy to use and allowed for sub-arguments with all the power I wanted. So
 instead I re-built an [existing-library](https://github.com/urfave/cli) from [golang](https://golang.org/)
