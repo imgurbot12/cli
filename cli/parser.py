@@ -126,6 +126,12 @@ class ArgumentParser:
             # add in default value if has one
             elif flag.default is not None:
                 collected[flag.names[0]] = flag.default
+            elif flag.required:
+                self.app.on_usage_error(
+                    context,
+                    'Flag: %r is required!' % ', '.join(flag.names),
+                    context is not None,
+                )
         # remove indexes from values that are collected flags and their values
         # reverse order of indexes to delete them backwards to avoid issues
         for index in sorted(indexes, reverse=True):
