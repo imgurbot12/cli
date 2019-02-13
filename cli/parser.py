@@ -28,6 +28,13 @@ class ArgumentParser:
             cmd_path="app",
         )
 
+    @staticmethod
+    def _concat_flags(flag_names, new_flag_names):
+        """return copy and concatination of two dictionaries"""
+        new_dict = flag_names.copy()
+        new_dict.update(new_flag_names)
+        return new_dict
+
     def _validate(self, cmd_names, flag_names, commands, cmd_path):
         """recursively iterate commands and flags to ensure that no command names or flags are overlapping"""
         # check if command names are already in use
@@ -66,7 +73,7 @@ class ArgumentParser:
             # run recursively for sub-commands and their flags
             self._validate(
                 cmd_names=cmd_names.copy(),
-                flag_names=dict(flag_names.items() + new_flag_names.items()),
+                flag_names=self._concat_flags(flag_names, new_flag_names),
                 commands=cmd.subcommands,
                 cmd_path=cmd_path + "->" + cmd.name,
             )
