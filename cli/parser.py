@@ -3,6 +3,8 @@ from .context import Context, GlobalContext
 from .help import show_app_help
 
 #** Classes **#
+
+
 class ArgumentParser:
     """
     Handler object for parsing and running commands based on given values
@@ -15,34 +17,59 @@ class ArgumentParser:
         self.app = app
         self.values = []
         self._validate(
-            {},
-            {name:flag.names[0] for flag in self.app.flags for name in flag.names}, # all global flag names
-            self.app.commands,
-            "app",
+            cmd_names={},
+            # all global flag names
+            flag_names={
+                name: 'app:%s' % flag.names[0]
+                for flag in self.app.flags
+                for name in flag.names
+            },
+            commands=self.app.commands,
+            cmd_path="app",
         )
 
     def _validate(self, cmd_names, flag_names, commands, cmd_path):
         """recursively iterate commands and flags to ensure that no command names or flags are overlapping"""
         # check if command names are already in use
         for i, cmd in enumerate(commands, 0):
+            # keep track of collected new flags in this command-set
+            new_flag_names = {}
+            # iterate command nams and
             for name in cmd.names():
                 if name in cmd_names:
                     self.app.exit_with_error(
                         '{0}->{1}: "{2}", name: {3} in use by: "{4}"!'.format(
-                            cmd_path, cmd.name+"["+str(i)+"]", ", ".join(cmd.names()), name, cmd_names[name]), 2)
+                            cmd_path,
+                            cmd.name+"["+str(i)+"]",
+                            ", ".join(cmd.names()),
+                            name,
+                            cmd_names[name]
+                        ), 2)
                 else:
                     cmd_names[name] = cmd_path+"->"+cmd.name+"["+str(i)+"]"
-                # check if command flag names are already in use
-                for flag in cmd.flags:
-                    for fname in flag.names:
-                        if fname in flag_names:
-                            self.app.exit_with_error(
-                                '{0}->{1}->flag: "{2}", name: "{3}" in use by: "{4}"!'.format(
-                                    cmd_path, cmd.name, flag, fname, flag_names[fname]), 2)
-                        else:
-                            flag_names[fname] = flag.names[0]
+            # check if command flag names are not in any flags above
+            for n, flag in enumerate(cmd.flags, 0):
+                for fname in flag.names:
+                    if fname in flag_names:
+                        self.app.exit_with_error(
+                            '{0}->{1}->flag: "{2}", name: "{3}" in use by: "{4}"!'.format(
+                                cmd_path,
+                                cmd.name,
+                                flag,
+                                fname,
+                                flag_names[fname]
+                                ), 2)
+                    else:
+                        new_flag_names[fname] = '{0}->{1}:{2}'.format(
+                            cmd_path, cmd.name, flag.names[0],
+                        )
             # run recursively for sub-commands and their flags
-            self._validate(cmd_names.copy(), flag_names.copy(), cmd.subcommands, cmd_path + "->" + cmd.name)
+            self._validate(
+                cmd_names=cmd_names.copy(),
+                flag_names=dict(flag_names.items() + new_flag_names.items()),
+                commands=cmd.subcommands,
+                cmd_path=cmd_path + "->" + cmd.name,
+            )
 
     def _get_flags(self, context, flags, values):
         """
@@ -52,7 +79,10 @@ class ArgumentParser:
         indexes = []    # list of indexes to delete from values
         collected = {}  # dict of flags that were collected from values
         # list only flags but keep length and placement the same to check for flag matches
-        only_flags = [word.lstrip("-") if word.startswith('-') else '' for word in values]
+        only_flags = [
+            word.lstrip("-") if word.startswith('-') else ''
+            for word in values
+        ]
         # iterate flags attempting to index and collect values for each flag
         for flag in flags:
             index = flag.index(only_flags)
@@ -60,21 +90,30 @@ class ArgumentParser:
                 indexes.append(index)
                 # ensure flag does not appear twice
                 if flag.index(only_flags[index+1:]) > -1:
-                    self.app.on_usage_error(context, 'Flag: %r is repeated!' % ", ".join(flag.names),
-                                            context is not None)
+                    self.app.on_usage_error(
+                        context,
+                        'Flag: %r is repeated!' % ", ".join(flag.names),
+                        context is not None
+                    )
                 # add flag=value if present else add flag=true
                 if flag.has_value:
                     # check that value actually exists after flag
                     if index+1 >= len(values):
-                        self.app.on_usage_error(context,
-                                                "Flag: %r requires value! (type=%r)" %
-                                                (", ".join(flag.names), flag.__class__.__name__), context is not None)
+                        self.app.on_usage_error(
+                            context,
+                            "Flag: %r requires value! (type=%r)" % (
+                                ", ".join(flag.names), flag.__class__.__name__
+                            ),
+                            context is not None
+                        )
                     value = flag.convert(values[index+1])
                     if value is False:
-                        self.app.exit_with_error("%s decode value failure: %r" % (flag, values[index+1]), 1)
+                        self.app.exit_with_error(
+                            "%s decode value failure: %r" % (flag, values[index+1]), 1)
                     # append value to collected flags
                     collected[flag.names[0]] = value
-                    indexes.append(index+1)  # append value's index to delete as well
+                    # append value's index to delete as well
+                    indexes.append(index+1)
                 else:
                     collected[flag.names[0]] = True
             # add in default value if has one
@@ -105,7 +144,8 @@ class ArgumentParser:
             # check for any invalid flags
             for value in values:
                 if value.startswith("-"):
-                    self.app.on_usage_error(context, "flag provided but not defined: %s" % value, context is not None)
+                    self.app.on_usage_error(
+                        context, "flag provided but not defined: %s" % value, context is not None)
             return False
         # attempt to collect flags for command
         flags, values = self._get_flags(context, command.flags, values)
@@ -113,7 +153,8 @@ class ArgumentParser:
         cmd_index = values.index(command_name)
         if cmd_index != 0:
             if values[0].startswith("-"):
-                self.app.on_usage_error(context, "flag provided but not defined: %s" % values[0], context is not None)
+                self.app.on_usage_error(
+                    context, "flag provided but not defined: %s" % values[0], context is not None)
             else:
                 self.app.not_found_error(context, values[0])
         # collect arguments for command before any sub-commands
@@ -127,11 +168,21 @@ class ArgumentParser:
         args = values[1:sub_index]
         for arg in args:
             if arg.startswith("-"):
-                self.app.on_usage_error(context, "flag provided but not defined: %s" % arg, context is not None)
+                self.app.on_usage_error(
+                    context,
+                    "flag provided but not defined: %s" % arg,
+                    context is not None
+                )
         # create new context object and run command action
-        context = Context(context.app, context.dictionary['global-flags'], context, command, flags, args)
-        command._has_subarg = values[sub_index:] != []  # tell command whether it has any sub-args
-        command.run(context)                            # run command's action with context
+        context = Context(
+            context.app,
+            context.dictionary['global-flags'],
+            context, command, flags, args
+        )
+        # tell command whether it has any sub-args
+        command._has_subarg = values[sub_index:] != []
+        # run command's action with context
+        command.run(context)
         # iterate again for commands sub-commands if available
         self._run_commands(context, values[sub_index:])
         return True
@@ -147,7 +198,8 @@ class ArgumentParser:
         adding them to context object and running commands recursively
         """
         # get global flags and update values
-        global_flags, self.values = self._get_flags(None, self.app.flags, values)
+        global_flags, self.values = self._get_flags(
+            None, self.app.flags, values)
         # create base context as place-holder
         context = GlobalContext(self.app, global_flags, self.values)
         # check if builtin help or version flag exists
