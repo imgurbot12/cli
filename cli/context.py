@@ -1,6 +1,8 @@
 from .commands import Command
 
 #** Classes **#
+
+
 class Args(list):
 
     def get(self, index):
@@ -28,6 +30,7 @@ class Args(list):
         if fromidx >= len(self) or toidx >= len(self):
             raise ValueError("index out of range")
         self[fromidx], self[toidx] = self[toidx], self[fromidx]
+
 
 class Context(object):
 
@@ -77,6 +80,14 @@ class Context(object):
                 if flag_name in flag.names:
                     return flag.names[0] in self.dictionary[dict_key]
         return False
+
+    def on_usage_error(self, msg):
+        """direct access to on-usage-error that automatically passes context"""
+        self.app.on_usage_error(self, msg, self.parent_c is not None)
+
+    def exit_with_error(self, msg, exit_code=1):
+        """direct access to exit-with-error from app"""
+        self.app.exit_with_error(msg, exit_code)
 
     def num_flags(self):
         """return number of flags"""
@@ -130,6 +141,7 @@ class Context(object):
         """return number of arguments"""
         return len(self.dictionary['args'])
 
+
 class GlobalContext(Context):
     """
     global instance of Context object used as base parent context
@@ -139,4 +151,5 @@ class GlobalContext(Context):
 
     def __init__(self, app, global_flags, args):
         command = Command("", subcommands=app.commands)
-        super(GlobalContext, self).__init__(app, global_flags, None, command, global_flags, args)
+        super(GlobalContext, self).__init__(
+            app, global_flags, None, command, global_flags, args)
