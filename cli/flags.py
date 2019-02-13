@@ -122,7 +122,7 @@ class DurationFlag(TypeFlag):
             return self._parse(string)
         except: return False
 
-class EnumFlag(cli.TypeFlag):
+class EnumFlag(TypeFlag):
     """
     flag designed to allow for an enumeration of valid respones and types
 
