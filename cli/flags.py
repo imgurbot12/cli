@@ -79,22 +79,22 @@ class BoolFlag(TypeFlag):
 
 class IntFlag(TypeFlag):
 
-    def __init__(self, name, usage="", default=None, hidden=False):
+    def __init__(self, name, usage="", default=None, hidden=False, required=False):
         super(IntFlag, self).__init__(name, int, usage, default, hidden, required)
 
 class FloatFlag(TypeFlag):
 
-    def __init__(self, name, usage="", default=None, hidden=False):
+    def __init__(self, name, usage="", default=None, hidden=False, required=False):
         super(FloatFlag, self).__init__(name, float, usage, default, hidden, required)
 
 class StringFlag(TypeFlag):
 
-    def __init__(self, name, usage="", default=None, hidden=False):
+    def __init__(self, name, usage="", default=None, hidden=False, required=False):
         super(StringFlag, self).__init__(name, str, usage, default, hidden, required)
 
 class ListFlag(TypeFlag):
 
-    def __init__(self, name, usage="", default=None, hidden=False):
+    def __init__(self, name, usage="", default=None, hidden=False, required=False):
         super(ListFlag, self).__init__(name, list, usage, default, hidden, required)
 
 class DurationFlag(TypeFlag):
