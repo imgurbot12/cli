@@ -1,155 +1,87 @@
-from .commands import Command
+"""
+"""
+from dataclasses import dataclass, field
+from typing import Dict, Any
+
+from .flag import Flags
+
+#** Variables **#
+__all__ = ['FlagDict', 'Context']
+
+FlagDict = Dict[str, Any]
 
 #** Classes **#
 
+@dataclass
+class Context:
+    """"""
+    app:     'App'
+    command: 'Command'
+    parent:  Optional['Context'] = None
+    gflags:  Optional[FlagDict]  = field(default_factory=dict)
+    flags:   Optional[FlagDict]  = field(default_factory=dict)
+    args:    Optional[Args]      = None
 
-class Args(list):
+    def _get_key(self, flags: Flags, d: FlagDict, k: str) -> Optional[str]:
+        """retrieve key that will work best for updating dictionary"""
+        if k not in d:
+            for f in flags:
+                if k in f.names:
+                    return f.names[0]
 
-    def get(self, index):
-        """return n-th argument in args"""
-        if len(self) > index:
-            return self[index]
-        return ""
+    def _set(self, flags: Flags, d: FlagDict, k: str, v: Any):
+        """set value into dictionary"""
+        key    = self._get_key(flags, d, k) or k
+        d[key] = v
 
-    def first(self):
-        """return 1st argument in args"""
-        return self.get(0)
+    def _get(self, flags: Flags, d: FlagDict, k: str) -> Any:
+        """get value from dictionary if exists"""
+        key = self._get_key(flags, d, k)
+        if key not is None:
+            return d[key]
 
-    def tail(self):
-        """return all arguments but first"""
-        if len(self) >= 2:
-            return self[1:]
-        return self
-
-    def present(self):
-        """return true if there are any arguments"""
-        return len(self) != 0
-
-    def swap(self, fromidx, toidx):
-        """swap from and to index in list"""
-        if fromidx >= len(self) or toidx >= len(self):
-            raise ValueError("index out of range")
-        self[fromidx], self[toidx] = self[toidx], self[fromidx]
-
-
-class Context(object):
-
-    def __init__(self, app, global_flags, parent_context, command, flags, args):
-        self.app = app
-        self.command = command
-        self.dictionary = {
-            'global-flags': global_flags,
-            'flags': flags,
-            'args': Args(args),
-        }
-        self.parent_c = parent_context
-
-    def _set_flag(self, flag_name, value, flag_list, dict_key):
+    def set(self, name: str, value: Any):
         """
-        attempt to replace/write/create flag value
-        according to primary flag name if possible
+        set a new localized flag value
+
+        :param name:  name of the flag
+        :param value: value being set
         """
-        # attempt to overwrite existing value if exists
-        if flag_name in self.dictionary[dict_key]:
-            self.dictionary[dict_key][flag_name] = value
-        else:
-            # attempt to find main flag name and add it by that name
-            for flag in flag_list:
-                if flag_name in flag.names:
-                    self.dictionary[dict_key][flag.names[0]] = value
-                    return
-            # if its not any existing flag name, add it as a new flag
-            self.dictionary[dict_key][flag_name] = value
+        self._set(self.command.flags, self.flags, name, value)
 
-    def _get_flag(self, flag_name, flag_list, dict_key):
-        """attempt to collect flag value by primary flag name"""
-        if flag_name in self.dictionary[dict_key]:
-            return self.dictionary[dict_key][flag_name]
-        else:
-            for flag in flag_list:
-                if flag_name in flag.names:
-                    return self.dictionary[dict_key][flag.names[0]]
-        return False
+    def get(self, name: str) -> Any:
+        """
+        collect a localized flag value
 
-    def _get_set(self, flag_name, flag_list, dict_key):
-        """determine if flag name in list of flags using dict-key"""
-        if flag_name in self.dictionary[dict_key]:
-            return True
-        else:
-            for flag in flag_list:
-                if flag_name in flag.names:
-                    return flag.names[0] in self.dictionary[dict_key]
-        return False
+        :param name: name of the flag
+        :return:     value of the flag if exists
+        """
+        return self._get(self.command.flags, self.flags, name)
 
-    def on_usage_error(self, msg):
-        """direct access to on-usage-error that automatically passes context"""
-        self.app.on_usage_error(self, msg, self.parent_c is not None)
+    def set_global(self, name: str, value: Any):
+        """
+        set a new global flag value
 
-    def exit_with_error(self, msg, exit_code=1):
-        """direct access to exit-with-error from app"""
-        self.app.exit_with_error(msg, exit_code)
+        :param name:  name of the flag
+        :param value: value being set
+        """
+        self._set(self.app.flags, self.gflags, name, value)
 
-    def num_flags(self):
-        """return number of flags"""
-        return len(self.dictionary['flags'])
+    def get_global(self, name: str) -> Any:
+        """
+        collect a global flag value
 
-    def set(self, name, value):
-        """add flag to flags dict"""
-        return self._set_flag(name, value, self.command.flags, 'flags')
+        :param name: name of the flag
+        :return:     value of the flag if exists
+        """
+        return self._get(self.app.flags, self.gflags, name)
 
-    def global_set(self, name, value):
-        """add flag to global-flags dict"""
-        return self._set_flag(name, value, self.app.flags, 'global-flags')
+    def on_usage_error(self, error: str):
+        """
+        """
+        self.app.on_usage_error(error)
 
-    def flag_set(self, name, value):
-        """add flag to flags dict"""
-        return self._set_flag(name, value, self.command.flags, 'flags')
-
-    def global_flag(self, flag):
-        """attempt to return global flag from dictionary"""
-        return self._get_flag(flag, self.app.flags, 'global-flags')
-
-    def flag(self, flag):
-        """attempt to return local flag from dictionary"""
-        return self._get_flag(flag, self.command.flags, 'flags')
-
-    def flag_is_set(self, flag):
-        """determine if command-flag is set"""
-        return self._get_set(flag, self.command.flags, 'flags')
-
-    def global_is_set(self, flag):
-        """determine if global-flag is set"""
-        return self._get_set(flag, self.app.flags, 'global-flags')
-
-    def flag_names(self):
-        """return list of flag names"""
-        return [flag.names[0] for flag in self.dictionary['flags']]
-
-    def global_flag_names(self):
-        """return list of global-flag names"""
-        return [flag.names[0] for flag in self.dictionary['global-flags']]
-
-    def parent(self):
-        """return parent context object"""
-        return self.parent_c
-
-    def args(self):
-        """return list of arguments for command"""
-        return self.dictionary['args']
-
-    def narg(self):
-        """return number of arguments"""
-        return len(self.dictionary['args'])
-
-
-class GlobalContext(Context):
-    """
-    global instance of Context object used as base parent context
-    for any other context objects as well as the base object for
-    ArgumentParser to use to parse all incoming arguments
-    """
-
-    def __init__(self, app, global_flags, args):
-        command = Command("", subcommands=app.commands)
-        super(GlobalContext, self).__init__(
-            app, global_flags, None, command, global_flags, args)
+    def exit_with_error(self, error: str, exit_code: int = 1):
+        """
+        """
+        self.app.exit_with_error(error, exit_code)
