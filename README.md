@@ -86,7 +86,7 @@ action to execute and some help documentation:
 import cli
 import sys
 
-def boom(ctx: Context):
+def boom(ctx: cli.Context):
     print("boom! I say!")
 
 app = cli.App(
