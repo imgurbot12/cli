@@ -1,26 +1,87 @@
 """
+context object and help object definitons useful for tracking application state
 """
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from .flag import Flags
 
 #** Variables **#
-__all__ = ['FlagDict', 'Context']
+__all__ = [
+    'FlagDict',
+    'NO_ACTION',
 
+    'UsageError',
+    'ExitError',
+    'NotFoundError',
+
+    'Args',
+    'Context',
+]
+
+#: simple defintion for dictionaries used in context object
 FlagDict = Dict[str, Any]
+
+#: tracker for parser to know if a command has taken no action
+NO_ACTION = 'NO_COMMAND_ACTION_TAKEN'
+
+#** Exceptions **#
+
+class UsageError(Exception):
+    """raise error during usage issue"""
+
+class ExitError(Exception):
+    """raise error when app must exit"""
+
+class NotFoundError(Exception):
+    """raise error when app gets flag it doesnt recognize"""
 
 #** Classes **#
 
+class Args(list):
+    """extended list object intended to add ease-of-use functions for context"""
+
+    def get(self, index: int) -> Optional[str]:
+        """
+        retrieve value from arguments at given index
+
+        :param index: index of arg to collect
+        :return:      value from index if exists
+        """
+        if len(self) > index:
+            return self[index]
+        return None
+
+    def first(self) -> Optional[str]:
+        """return 1st argument in args"""
+        return self.get(0)
+
+    def tail(self) -> List[str]:
+        """return all arguments but first"""
+        if len(self) >= 2:
+            return self[1:]
+        return self
+
+    def present(self):
+        """return true if there are any arguments"""
+        return len(self) != 0
+
+    def swap(self, fromidx: int, toidx: int):
+        """swap from and to index in list"""
+        if fromidx >= len(self) or toidx >= len(self):
+            raise ValueError("index out of range")
+        self[fromidx], self[toidx] = self[toidx], self[fromidx]
+
 @dataclass
 class Context:
-    """"""
-    app:     'App'
-    command: 'Command'
-    parent:  Optional['Context'] = None
+    """passes information into/from various command actions"""
+
+    app:     'App'               = field(repr=False)
+    command: 'Command'           = field(repr=False)
+    parent:  Optional['Context'] = field(default=None, repr=False)
     gflags:  Optional[FlagDict]  = field(default_factory=dict)
     flags:   Optional[FlagDict]  = field(default_factory=dict)
-    args:    Optional[Args]      = None
+    args:    Optional[Args]      = field(default_factory=Args)
 
     def _get_key(self, flags: Flags, d: FlagDict, k: str) -> Optional[str]:
         """retrieve key that will work best for updating dictionary"""
@@ -37,7 +98,7 @@ class Context:
     def _get(self, flags: Flags, d: FlagDict, k: str) -> Any:
         """get value from dictionary if exists"""
         key = self._get_key(flags, d, k)
-        if key not is None:
+        if key is not None:
             return d[key]
 
     def set(self, name: str, value: Any):
@@ -78,10 +139,17 @@ class Context:
 
     def on_usage_error(self, error: str):
         """
+        handle a usage error with the current action
+
+        :param error: error-message to pass to handlers
         """
-        self.app.on_usage_error(error)
+        raise UsageError(error)
 
     def exit_with_error(self, error: str, exit_code: int = 1):
         """
+        exit with the following error and exit-code for some unrecoverable error
+
+        :param error:     error-message to pass to handlers
+        :param exit_code: exit-code to exit program with
         """
-        self.app.exit_with_error(error, exit_code)
+        raise ExitError(error, exit_code)
