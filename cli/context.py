@@ -85,7 +85,9 @@ class Context:
 
     def _get_key(self, flags: Flags, d: FlagDict, k: str) -> Optional[str]:
         """retrieve key that will work best for updating dictionary"""
-        if k not in d:
+        if k in d:
+            return k
+        else:
             for f in flags:
                 if k in f.names:
                     return f.names[0]

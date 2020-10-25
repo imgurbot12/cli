@@ -90,7 +90,7 @@ class App(CommandBase):
 
     def exit_with_error(ctx: Context, cmd: Command, err: str, code: int):
         """"""
-        print(f"App-Error: {error}", file=ctx.app.err_writer)
+        print(f"App-Error: {err}", file=ctx.app.err_writer)
         raise SystemExit(code)
 
     def not_found_error(ctx: Context, cmd: Command, arg: str):

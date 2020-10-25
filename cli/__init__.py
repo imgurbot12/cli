@@ -31,6 +31,9 @@ __all__ = [
     'EnumFlag',
 
     'run_app',
+
+    'help_app_template',
+    'help_cmd_template',
 ]
 
 from .app import *
@@ -38,3 +41,4 @@ from .flag import *
 from .context import *
 from .command import *
 from .parser import *
+from .help import *

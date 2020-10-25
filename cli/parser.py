@@ -25,11 +25,11 @@ def split_arguments(
     :return:     (next-command <if any>, related-values, unrelated-values)
     """
     args.pop(0)
-    indexes = [
+    indexes = sorted([
         (c,i)
         for c,i in ((c,c.index(args)) for c in cmd.commands)
         if i != -1
-    ]
+    ], key=lambda x: x[1])
     next_cmd, idx = indexes[0] if indexes else (None, len(args))
     return (next_cmd, args[:idx], args[idx:])
 

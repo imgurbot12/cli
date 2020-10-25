@@ -11,6 +11,9 @@ from .command import CommandBase, Command
 
 #** Variables **#
 __all__ = [
+    'help_app_template',
+    'help_cmd_template',
+
     'help_action',
 
     'help_flag',
@@ -136,26 +139,27 @@ def get_vars(cmd: CommandBase) -> dict:
     })
     return kwargs
 
-def help_action(ctx: Context, cmd: Optional[Command] = None):
+def help_action(ctx: Context, command: Optional[Command] = None):
     """action used to render help content"""
     # recurse arguments to find sub-command
-    command = cmd or ctx.app
+    cmd = command or ctx.app
     if ctx.args.present():
         path = 'app'
         for arg in ctx.args:
-            for cmd in command.commands:
-                if cmd.has_name(arg):
-                    path   += '->' + cmd.name
-                    command = cmd
+            for c in cmd.commands:
+                if c.has_name(arg):
+                    path += '->' + c.name
+                    cmd   = c
                     break
             else:
-                ctx.app.not_found_error(ctx, command, path)
+                if command is None:
+                    ctx.app.not_found_error(ctx, cmd, path+'->'+arg)
     # set template based on given command
     template = ctx.app.help_app_template or help_app_template
-    if command != ctx.app:
+    if cmd != ctx.app:
         template = ctx.app.help_cmd_template or help_cmd_template
     # get arguments from command and render template
-    kwargs    = get_vars(command)
+    kwargs    = get_vars(cmd)
     jtemplate = env.from_string(template.strip())
     print(jtemplate.render(**kwargs), file=ctx.app.writer)
 
