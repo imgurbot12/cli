@@ -83,18 +83,18 @@ class App(CommandBase):
         self.commands.insert(0, help_command)
 
     def on_usage_error(ctx: Context, cmd: Command, error: str):
-        """"""
+        """handles usage errors during parsing or from context"""
         print(f'Incorrect Usage: {error}\n', file=ctx.app.err_writer)
         help_action(ctx, cmd)
         raise SystemExit(4)
 
     def exit_with_error(ctx: Context, cmd: Command, err: str, code: int):
-        """"""
+        """handles unrecoverable exceptions that must lead to complete exit"""
         print(f"App-Error: {err}", file=ctx.app.err_writer)
         raise SystemExit(code)
 
     def not_found_error(ctx: Context, cmd: Command, arg: str):
-        """"""
+        """handles issues with invalid flags and bad command paths on help"""
         if arg.startswith('-'):
             msg = f'Command: {cmd.name}, Invalid Flag: {arg}'
         else:
@@ -104,6 +104,10 @@ class App(CommandBase):
 
     def run(self, args: List[str] = sys.argv) -> Optional[asyncio.Future]:
         """
+        run the relevant actions based on the arguments given and app defintions
+
+        :param args: arguments being parsed and passed into relevant actions
+        :return:     asyncio.Future if run_async=True
         """
         loop   = asyncio.get_event_loop()
         future = asyncio.ensure_future(run_app(self, args))
