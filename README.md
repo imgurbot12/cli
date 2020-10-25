@@ -66,10 +66,6 @@ tested it on any other platforms.
 One of the philosophies behind cli is that an API should be playful and full of
 discovery. So a cli app can be as little as one line of code in `main()`.
 
-<!-- {
-  "args": ["&#45;&#45;help"],
-  "output": "A new cli application"
-} -->
 ``` python
 import cli
 import sys
@@ -86,14 +82,11 @@ app = cli.App(
 This app will run and show help text, but is not very useful. Let's give an
 action to execute and some help documentation:
 
-<!-- {
-  "output": "boom! I say!"
-} -->
 ``` python
 import cli
 import sys
 
-def boom(context):
+def boom(ctx: Context):
     print("boom! I say!")
 
 app = cli.App(
@@ -117,14 +110,11 @@ loneliness!
 
 Start by creating a file named `greet.py` with the following code in it:
 
-<!-- {
-  "output": "Hello friend!"
-} -->
 ``` python
 import cli
 import sys
 
-def hello(context):
+def hello(ctx: cli.Context):
     print("Hello friend!")
 
 app = cli.App(
@@ -139,7 +129,7 @@ app = cli.App(
 
 Finally run our new script:
 
-```
+```bash
 $ python greet.py
 Hello friend!
 ```
@@ -149,16 +139,16 @@ cli also generates neat help text:
 ```
 NAME:
     greet - fight the loneliness!
-    
+
 USAGE:
     [global options] command [command options] [arguments...]
-    
+
 VERSION:
     1.0.0
 
 COMMANDS:
       help, h	shows a list of commands or help for one command
-      
+
 GLOBAL OPTIONS:
     --help		shows a list of commands
     --version, -v	print the version
@@ -166,17 +156,14 @@ GLOBAL OPTIONS:
 
 ### Arguments
 
-You can lookup arguments by calling the `args()` function on `context`, e.g.:
+You can lookup arguments by calling the `.args` attribute on `context`, e.g.:
 
-<!-- {
-  "output": "Hello \""
-} -->
 ``` python
 import cli
 import sys
 
-def hello(context):
-    print("Hello %r" % (context.args().get(0)))
+def hello(ctx: cli.Context):
+    print("Hello %s!" % (ctx.args.get(0) or 'friend'))
 
 app = cli.App(
     name="greet",
@@ -192,18 +179,15 @@ app = cli.App(
 
 Setting and querying flags is simple.
 
-<!-- {
-  "output": "Hello Nefertiti"
-} -->
 ``` python
 import cli
 import sys
 
-def hello(context):
+def hello(ctx: cli.Context):
     name = "Nefertiti"
-    if context.narg() > 0:
-        name = context.args().get(0)
-    if context.flag("lang") == "spanish":
+    if len(ctx.args) > 0:
+        name = ctx.args.get(0)
+    if ctx.get("lang") == "spanish":
         print("Hola "+name)
     else:
         print("Hello "+name)
@@ -229,10 +213,6 @@ app = cli.App(
 You can set alternate (or short) names for flags by providing a comma-delimited
 list for the `Name`. e.g.
 
-<!-- {
-  "args": ["&#45;&#45;help"],
-  "output": "&#45;&#45;lang value, &#45;l value.*language for the greeting.*default: \"english\""
-} -->
 ``` python
 import cli
 import sys
@@ -260,25 +240,21 @@ error.
 
 Subcommands can be defined for a more git-like command line app.
 
-<!-- {
-  "args": ["template", "new"],
-  "output": "new task template: .+"
-} -->
 ``` python
 import cli
 import sys
 
-def add(context):
-    print("added task: "+context.args().first())
+def add(ctx: cli.Context):
+    print("added task: " + ctx.args.first())
 
-def complete(context):
-    print("completed task: "+context.args().first())
+def complete(ctx: cli.Context):
+    print("completed task: " + ctx.args.first())
 
-def new_template(context):
-    print("new task template: "+context.args().first())
+def new_template(ctx: cli.Context):
+    print("new task template: " + ctx.args.first())
 
-def remove_template(context):
-    print("removed task template: "+context.args().first())
+def remove_template(ctx: cli.Context):
+    print("removed task template: "+ ctx.args.first())
 
 app = cli.App(
     name="greet",
@@ -302,7 +278,7 @@ app = cli.App(
             name="template",
             aliases=["t"],
             usage="options for task templates",
-            subcommands=[
+            commands=[
                 cli.Command(
                     name="new",
                     usage="add a new template",
@@ -349,10 +325,10 @@ Will include:
 ```
 COMMANDS:
       help, h	shows a list of commands or help for one command
-      noop	
+      noop
 
     Template actions:
-      add	
+      add
       remove
 ```
 
@@ -366,9 +342,9 @@ may be set by returning a non-null error e.g.:
 import cli
 import sys
 
-def do_exit(context):
-    if context.flag("ginger-crouton"):
-        context.app.exit_with_error("it is not in the soup", 80)
+def do_exit(ctx: cli.Context):
+    if ctx.get("ginger-crouton"):
+        ctx.exit_with_error("it is not in the soup", 80)
 
 app = cli.App(
     name="greet",
@@ -390,26 +366,22 @@ app = cli.App(
 All of the help text generation may be customized, and at multiple levels.  The
 templates are exposed as app variables `app.help_template`, and
 `app.cmd_help_template` which may be reassigned or augmented, and full override
-is possible by assigning a compatible [jinja2](http://jinja.pocoo.org/) template,
+is possible by assigning a compatible [jinja2](https://jinja.palletsprojects.com/en/2.11.x/) template,
 e.g.:
 
-<!-- {
-  "output": "Ha HA.  I pwnd the help!!1"
-} -->
 ``` python
 import cli
 import sys
 
 # EXAMPLE: Append to an existing template
-new_template = cli.default_app_help + """
+new_template = cli.help_app_template + """
 WEBSITE: http://awesometown.example.com
-
 SUPPORT: support@awesometown.example.com
 
 """
 
 # EXAMPLE: Override a template
-"""NAME:
+new_template = """NAME:
     {{name}} - {{usage}}
 
 USAGE:
@@ -419,7 +391,7 @@ AUTHOR:
     {%for author in authors%}{{author}}{%endfor%}
     {%endif%}{%if commands%}
 COMMANDS:
-    {%for flag in visible_flags%}{{flag}}
+    {%for cmd in visible_commands%}{{cmd.to_string()}}
     {%endfor%}{%endif%}{%if copyright%}
 COPYRIGHT:
     {{copyright}}
@@ -433,7 +405,7 @@ app = cli.App(
     name="greet",
     usage="fight the loneliness!",
     version="1.0.0",
-    help_template=new_template,
+    help_app_template=new_template,
     flags=[
         cli.BoolFlag(
             name="ginger-crouton",
@@ -443,5 +415,3 @@ app = cli.App(
     commands=[],
 ).run(sys.argv)
 ```
-
-
