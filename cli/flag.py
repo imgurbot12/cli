@@ -77,7 +77,7 @@ class Flag:
         """convert cli-value into the correct-type"""
         try:
             return self.type(value)
-        except Exception as e:
+        except Exception:
             return None
 
 @dataclass
@@ -112,7 +112,7 @@ class DecimalFlag(Flag):
         """handle float founding based on decimal setting"""
         try:
             return round(float(value), self.decimal)
-        except:
+        except Exception:
             return None
 
 @dataclass
@@ -124,7 +124,7 @@ class ListFlag(Flag):
         """convert value into list object"""
         try:
             return [c.strip() for c in value.split(',')]
-        except:
+        except Exception:
             return None
 
 @dataclass
@@ -138,7 +138,7 @@ class DurationFlag(Flag):
             m = _re_duration.match(value)
             d = {k:int(v.strip('hms')) for k,v in m.groupdict().items()}
             return timedelta(**d)
-        except Exception as e:
+        except Exception:
             return None
 
 @dataclass
@@ -155,5 +155,5 @@ class EnumFlag:
                 return None
             # translate if dict, otherwise return value
             return self.enum[value] if isinstance(self.enum, dict) else value
-        except:
+        except Exception:
             return None

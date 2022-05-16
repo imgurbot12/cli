@@ -48,9 +48,7 @@ class Args(list):
         :param index: index of arg to collect
         :return:      value from index if exists
         """
-        if len(self) > index:
-            return self[index]
-        return None
+        return self[index] if len(self) > index else None
 
     def first(self) -> Optional[str]:
         """return 1st argument in args"""
@@ -58,9 +56,7 @@ class Args(list):
 
     def tail(self) -> List[str]:
         """return all arguments but first"""
-        if len(self) >= 2:
-            return self[1:]
-        return self
+        return self[1:] if len(self) >= 2 else self
 
     def present(self):
         """return true if there are any arguments"""
@@ -87,10 +83,9 @@ class Context:
         """retrieve key that will work best for updating dictionary"""
         if k in d:
             return k
-        else:
-            for f in flags:
-                if k in f.names:
-                    return f.names[0]
+        for f in flags:
+            if k in f.names and f.names[0] in d:
+                return f.names[0]
 
     def _set(self, flags: Flags, d: FlagDict, k: str, v: Any):
         """set value into dictionary"""
@@ -100,8 +95,7 @@ class Context:
     def _get(self, flags: Flags, d: FlagDict, k: str) -> Any:
         """get value from dictionary if exists"""
         key = self._get_key(flags, d, k)
-        if key is not None:
-            return d[key]
+        return None if key is None else d[key]
 
     def set(self, name: str, value: Any):
         """
