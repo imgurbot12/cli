@@ -14,6 +14,10 @@ __all__ = [
     'Action',
     'Commands',
 
+    'range_args',
+    'exact_args',
+    'no_args',
+
     'CommandBase',
     'Command'
 ]
@@ -34,6 +38,38 @@ def _wraps(func: Callable) -> Callable:
             return func(*args, **kwargs)
         return wrapper
     return func
+
+def range_args(min: int = 0, max: Optional[int] = None) -> Action:
+    """
+    generate before action function to validate the number of arguments
+
+    :param min: minimum number of arguments
+    :param max: maximum number of arguments
+    :return:    function used to regulate argument numbers
+    """
+    def validate_range_args(ctx: Context):
+        if min < 0 and len(ctx.args) > 0:
+            ctx.on_usage_error('action does not take any arguments')
+        if min > 0 and len(ctx.args) < min:
+            ctx.on_usage_error(f'action must have at least {min} arguments')
+        if max and len(ctx.args) > max:
+            ctx.on_usage_error(f'action can have at maximum {max} arguments')
+    return validate_range_args
+
+def exact_args(num: int) -> Action:
+    """
+    generate before action function to validate the exact of arguments
+
+    :param num: number of allowed arguments
+    :return:    function used to regulate argument numbers
+    """
+    def validate_exact_args(ctx: Context):
+        if len(ctx.args) != num:
+            ctx.on_usage_error(f'action must have exactly {num} arguments')
+    return validate_exact_args
+
+#: public action validator to ensure no arguments are passed
+no_args = range_args(-1)
 
 #** Classes **#
 
