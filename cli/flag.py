@@ -26,7 +26,12 @@ __all__ = [
 Flags = List['Flag']
 
 _re_duration = re.compile(
-    r'^(?P<hours>\d+h)?(?P<minutes>\d+m)?(?P<seconds>\d+s)?$')
+    r'^(?P<weeks>\d+w)?'
+    r'(?P<days>\d+d)?'
+    r'(?P<hours>\d+h)?'
+    r'(?P<minutes>\d+m)?'
+    r'(?P<seconds>\d+s)?$'
+)
 
 #** Classes **#
 
@@ -135,8 +140,8 @@ class DurationFlag(Flag):
     def convert(self, value: str) -> Optional[timedelta]:
         """convert string-value into timedelta"""
         try:
-            m = _re_duration.match(value)
-            d = {k:int(v.strip('hms')) for k,v in m.groupdict().items()}
+            m = _re_duration.match(value).groupdict()
+            d = {k:int(v.strip('wdhms') if v else 0) for k,v in m.items()}
             return timedelta(**d)
         except Exception:
             return None
