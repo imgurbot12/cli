@@ -173,6 +173,19 @@ app = cli.App(
 ).run(sys.argv)
 ```
 
+You can also control the exact number of arguments passed to an app/command
+with the following controls:
+
+```python
+cli.Command(
+  name='example',
+  usage='control your arguments with these useful controls',
+  # before=no_args                   # <- blocks any and all args
+  # before=range_args(min=1, max=3)  # <- allows for a numbered range of args
+  before=exact_args(num=2)           # <- allows only exact number of args
+)
+```
+
 ### Flags
 
 Setting and querying flags is simple.

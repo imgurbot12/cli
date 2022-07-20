@@ -13,6 +13,10 @@ __all__ = [
     'Commands',
     'Command',
 
+    'range_args',
+    'exact_args',
+    'no_args',
+
     'UsageError',
     'ExitError',
     'NotFoundError',
@@ -36,6 +40,7 @@ __all__ = [
     'help_cmd_template',
 ]
 
+#** Imports **#
 from .app import *
 from .flag import *
 from .context import *
