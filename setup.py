@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='cli',
-    version='2.0.1',
+    version='2.0.2',
     packages=['cli'],
     url='https://github.com/imgurbot12/cli',
     license='MIT License',
