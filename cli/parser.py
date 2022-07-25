@@ -101,9 +101,9 @@ async def run_app(app: 'App', args: List[str]):
             if gflags is None:
                 gflags = flags
             ctx = Context(app, cmd, parent, gflags, flags, Args(values))
-            await cmd.before(ctx)
-            ret = await cmd.action(ctx)
-            await cmd.after(ctx)
+            await cmd.run_before(ctx)
+            ret = await cmd.run_action(ctx)
+            await cmd.run_after(ctx)
         # raise help if help-flag was given
         if gflags.get(help_flag.names[0]):
             help_action(ctx, cmd)

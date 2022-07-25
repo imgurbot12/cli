@@ -1,10 +1,11 @@
 """
 all possible flags allowed to be passed into application and parsed from args
 """
-import re
 from datetime import timedelta
 from dataclasses import dataclass, field
 from typing import List, Callable, Optional, Any, Union
+
+from .argument import *
 
 #** Variables **#
 __all__ = [
@@ -25,14 +26,6 @@ __all__ = [
 #: defintion for list of flags
 Flags = List['Flag']
 
-_re_duration = re.compile(
-    r'^(?P<weeks>\d+w)?'
-    r'(?P<days>\d+d)?'
-    r'(?P<hours>\d+h)?'
-    r'(?P<minutes>\d+m)?'
-    r'(?P<seconds>\d+s)?$'
-)
-
 #** Classes **#
 
 @dataclass
@@ -41,13 +34,11 @@ class Flag:
 
     name:      str
     usage:     Optional[str] = None
-    default:   Any  = None
-    hidden:    bool = False
-    required:  bool = False
-
-    type:      Any = str
-    has_value: bool = True
-    builtin:   bool = False
+    default:   Any           = None
+    hidden:    bool          = False
+    required:  bool          = False
+    type:      Any           = str
+    has_value: bool          = True
 
     def __post_init__(self):
         """ensure all flag settings are validated or raise error"""
@@ -88,8 +79,8 @@ class Flag:
 @dataclass
 class BoolFlag(Flag):
     """implementation for supporting boolean flags"""
-    type: Any = bool
-    default: Any = False
+    type:      Any  = bool
+    default:   Any  = False
     has_value: bool = False
 
 @dataclass
@@ -110,13 +101,13 @@ class FloatFlag(Flag):
 @dataclass
 class DecimalFlag(Flag):
     """implementation for supporting controlable decimal flags"""
-    type: Any = float
+    type:    Any = float
     decimal: int = 2
 
     def convert(self, value: str) -> Optional[float]:
         """handle float founding based on decimal setting"""
         try:
-            return round(float(value), self.decimal)
+            return parse_duration(value)
         except Exception:
             return None
 
@@ -140,9 +131,7 @@ class DurationFlag(Flag):
     def convert(self, value: str) -> Optional[timedelta]:
         """convert string-value into timedelta"""
         try:
-            m = _re_duration.match(value).groupdict()
-            d = {k:int(v.strip('wdhms') if v else 0) for k,v in m.items()}
-            return timedelta(**d)
+            return parse_duration(value)
         except Exception:
             return None
 

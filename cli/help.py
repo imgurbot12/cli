@@ -25,9 +25,12 @@ NAME:
     {{name}}{%if usage%} - {{usage}}{%endif%}
 
 USAGE:
-    {% if visible_flags %}[global flags]{% endif %}
-    {%- if commands %} command [command flags]{% endif %}
-    {%- if argsusage %} {{ argsusage }}{% else %} [arguments...]{% endif %}
+    {% if argsusage -%}
+        {{ argsusage }}
+    {%- else -%}
+        {%- if visible_flags %}[global flags]{% endif %}
+        {%- if visible_commands %} [command] [command flags]{% endif %}
+    {%- endif %}
 
 VERSION:
     {{ version }}
@@ -49,7 +52,7 @@ AUTHOR{%if authors|length > 1%}S{%endif%}:
 {%- if visible_commands %}
 
 COMMANDS:
-    {%-for category in visible_categories%}
+    {%- for category in visible_categories %}
         {%- set cbuffer = calc_buffer(visible_commands, category) %}
         {%- set active_category = category and category != "*" %}
         {%- if active_category %}
@@ -83,7 +86,13 @@ COPYRIGHT:
 
 help_cmd_template = """
 NAME:
-    {{name}}{%if usage%} - {{usage}}{%endif%}
+    {{name}}{% if usage %} - {{ usage }}{% endif %}
+
+{%- if argsusage %}
+
+USAGE:
+    {{ name }} {{ argsusage }}
+{%- endif %}
 
 {%- if visible_commands %}
 

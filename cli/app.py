@@ -45,9 +45,9 @@ class App(CommandBase):
     flags:       Flags               = field(default_factory=list, repr=False)
     commands:    Commands            = field(default_factory=list, repr=False)
 
-    email:     Optional[str]       = None
-    authors:   Optional[List[str]] = None
-    copyright: Optional[str]       = None
+    authors:   List[str]     = field(default_factory=list)  
+    email:     Optional[str] = None
+    copyright: Optional[str] = None
 
     writer:     RawIOBase = field(default=sys.stdout, repr=False)
     err_writer: RawIOBase = field(default=sys.stderr, repr=False)
