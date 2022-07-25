@@ -14,6 +14,8 @@ from .argument import *
 __all__ = [
     'Decimal',
     'Duration',
+    'NewFile',
+    'ExistingFile',
 
     'app',
     'action',
@@ -23,8 +25,10 @@ __all__ = [
 null = type(None)
 
 # custom typevars for associated translation functions
-Decimal  = TypeVar('Decimal')
-Duration = TypeVar('Duration')
+Decimal      = TypeVar('Decimal')
+Duration     = TypeVar('Duration')
+NewFile      = TypeVar('NewFile')
+ExistingFile = TypeVar('ExistingFile')
 
 #** Functions **#
 
@@ -61,13 +65,17 @@ def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
     if hint in (str, bytes, bytearray, int, float):
         return hint
     if hint in (set, list, tuple):
-        return parse_list_function(str, origin)
+        return parse_list_function(str, hint)
     if hint == bool:
         return parse_bool
     if hint == Decimal:
         return parse_decimal
     if hint in (Duration, timedelta):
         return parse_duration
+    if hint == NewFile:
+        return parse_new_file
+    if hint == ExistingFile:
+        return parse_existing_file
     # parse complex typehints
     origin, args = get_origin(hint), get_args(hint)
     if origin in (set, list, tuple):
@@ -96,17 +104,19 @@ def compile_command_values(
                 values.append(ctx)
                 continue
             # retrieve value from args if exists
-            value = ctx.args.get(tracked)
-            if value is None:
+            val = ctx.args.get(tracked)
+            if val is None:
                 continue
             # attempt convert args as standard
             try:
-                values.append(func(value))
+                values.append(func(val))
                 tracked += 1
+            except ArgumentError as err:
+                ctx.on_usage_error(f'argument name={name}, {err}')
             except Exception:
+                htype = getattr(hint, '__name__', hint)
                 ctx.on_usage_error(
-                    f'argument pos={n} name={name} value={value!r}'
-                    f' is an invalid {hint.__name__}'
+                    f'argument name={name} value={val!r} is an invalid {htype}'
                 )
         return values
     return validate_values

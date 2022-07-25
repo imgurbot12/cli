@@ -29,6 +29,7 @@ __all__ = [
     'ListFlag',
     'DurationFlag',
     'EnumFlag',
+    'FilePathFlag',
 
     'run_app',
 
@@ -41,6 +42,8 @@ __all__ = [
 
     'Decimal',
     'Duration',
+    'NewFile',
+    'ExistingFile',
 
     'app',
     'action',

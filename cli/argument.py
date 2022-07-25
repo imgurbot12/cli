@@ -1,6 +1,8 @@
 """
 argument parsers and implementations for special types
 """
+import io
+import os
 import re
 from typing import *
 from datetime import timedelta
@@ -8,10 +10,13 @@ from datetime import timedelta
 #** Variables **#
 __all__ = [
     'TypeFunc',
+    'ArgumentError',
 
     'parse_bool',
     'parse_decimal',
     'parse_duration',
+    'parse_new_file',
+    'parse_existing_file',
     'parse_list_function',
 
     'range_args',
@@ -31,6 +36,11 @@ re_duration = re.compile(
 #: type defintion for typehint translation for cli
 TypeFunc = Callable[[str], Any]
 
+#** Exceptions **#
+
+class ArgumentError(ValueError):
+    pass
+
 #** Functions **#
 
 def parse_bool(boolean: str) -> bool:
@@ -44,7 +54,7 @@ def parse_bool(boolean: str) -> bool:
         return False
     if boolean.lower() in ('1', 'true'):
         return True
-    raise ValueError(f'invalid boolean string: {boolean!r}')
+    raise ArgumentError(f'invalid boolean string: {boolean!r}')
 
 def parse_decimal(decimal: str, digits: int = 2) -> float:
     """
@@ -65,6 +75,28 @@ def parse_duration(duration: str) -> timedelta:
     match  = re_duration.match(duration).groupdict()
     kwargs = {k:int(v.strip('wdhms') if v else 0) for k,v in match.items()}
     return timedelta(**kwargs)
+
+def parse_new_file(file: str) -> str:
+    """
+    retrieve new filepath for a not yet existing file
+
+    :param file: filepath of new file
+    :return:     realpath of file
+    """
+    if os.path.exists(file):
+        raise ArgumentError(f'filepath: {file!r} already exists')
+    return os.path.realpath(file)
+
+def parse_existing_file(file: str) -> str:
+    """
+    retrieve an existing file instance from the given filepath
+
+    :param file: filepath of existing file
+    :return:     realpath of file
+    """
+    if not os.path.exists(file):
+        raise ArgumentError(f'filepath: {file!r} does not exist')
+    return os.path.realpath(file)
 
 def parse_list_function(typefunc: TypeFunc, origin: type = list) -> TypeFunc:
     """

@@ -2,6 +2,7 @@
 all possible flags allowed to be passed into application and parsed from args
 """
 from datetime import timedelta
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import List, Callable, Optional, Any, Union
 
@@ -21,10 +22,21 @@ __all__ = [
     'ListFlag',
     'DurationFlag',
     'EnumFlag',
+    'FilePathFlag',
 ]
 
 #: defintion for list of flags
 Flags = List['Flag']
+
+#** Functions **#
+
+@contextmanager
+def capture_errors():
+    """simple context-manager to capture any conversion errors"""
+    try:
+        yield None
+    except Exception:
+        pass
 
 #** Classes **#
 
@@ -71,10 +83,8 @@ class Flag:
 
     def convert(self, value: str) -> Any:
         """convert cli-value into the correct-type"""
-        try:
+        with capture_errors():
             return self.type(value)
-        except Exception:
-            return None
 
 @dataclass
 class BoolFlag(Flag):
@@ -106,10 +116,8 @@ class DecimalFlag(Flag):
 
     def convert(self, value: str) -> Optional[float]:
         """handle float founding based on decimal setting"""
-        try:
+        with capture_errors():
             return parse_duration(value)
-        except Exception:
-            return None
 
 @dataclass
 class ListFlag(Flag):
@@ -118,10 +126,8 @@ class ListFlag(Flag):
 
     def convert(self, value: str) -> Optional[list]:
         """convert value into list object"""
-        try:
+        with capture_errors():
             return [c.strip() for c in value.split(',')]
-        except Exception:
-            return None
 
 @dataclass
 class DurationFlag(Flag):
@@ -130,10 +136,8 @@ class DurationFlag(Flag):
 
     def convert(self, value: str) -> Optional[timedelta]:
         """convert string-value into timedelta"""
-        try:
+        with capture_errors():
             return parse_duration(value)
-        except Exception:
-            return None
 
 @dataclass
 class EnumFlag:
@@ -143,11 +147,18 @@ class EnumFlag:
 
     def convert(self, value: str) -> Optional[str]:
         """ensure the specified value is included in the enum"""
-        try:
-            # skip is value not in enum
+        with capture_errors():
             if value not in self.enum:
-                return None
-            # translate if dict, otherwise return value
+                return
             return self.enum[value] if isinstance(self.enum, dict) else value
-        except Exception:
-            return None
+
+@dataclass
+class FilePathFlag(Flag):
+    type:   Any  = str
+    exists: bool = True
+
+    def convert(self, value: str) -> str:
+        """ensure filepath exists or doesn't exist based on `exists` setting"""
+        if exists:
+            return parse_existing_file(value)
+        return parse_new_file(value)
