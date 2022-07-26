@@ -34,8 +34,10 @@ def wrap_async(func: Callable) -> Callable:
         async def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         # preserve function arguments and defaults in wraps
-        wrapper.__varnames__ = func.__code__.co_varnames
-        wrapper.__defaults__ = func.__defaults__
+        wrapper.__varnames__   = func.__code__.co_varnames
+        wrapper.__kwcount__    = func.__code__.co_kwonlyargcount
+        wrapper.__defaults__   = func.__defaults__
+        wrapper.__kwdefaults__ = func.__kwdefaults__
         return wrapper
     return func
 
@@ -139,7 +141,14 @@ class CommandBase:
         :return:     wrapped action function
         """
         from . import wraps
-        self.run_action = wraps.action(func)
+        # preserve original flags
+        if not hasattr(self, 'original_flags'):
+            self.original_flags = self.flags
+        # generate new action
+        action = wraps.action(func)
+        # save changes to command
+        self.flags      = [*self.original_flags, *action.flags]
+        self.run_action = action
         return self.run_action
 
     def after(self, func: Callable) -> Action:

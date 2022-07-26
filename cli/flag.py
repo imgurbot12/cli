@@ -54,7 +54,7 @@ class Flag:
 
     def __post_init__(self):
         """ensure all flag settings are validated or raise error"""
-        if self.default is not None:
+        if self.default is not None and isinstance(self.type, type):
             if not isinstance(self.default, self.type):
                 raise ValueError('default=%r not type=%s' % (
                     self.default, self.type.__name__))

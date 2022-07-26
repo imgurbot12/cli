@@ -6,6 +6,7 @@ from typing import *
 from datetime import timedelta
 
 from .app import App
+from .flag import Flag
 from .context import Context
 from .command import Action, Command, wrap_async
 from .argument import *
@@ -37,17 +38,23 @@ def inspectfunc(func: Callable) -> Tuple[list, dict, dict]:
     parse and retrieve list of argument names alongside argument typehints
 
     :param func: function being inspected for argument details
-    :return:     (list of args, defaults-dict, typehint-dict)
+    :return:     (list of args, list of kwargs, defaults-dict, typehint-dict)
     """
     # retrieve args from __varnames__ if func was run through `wrap_async`
-    args           = getattr(func, '__varnames__', func.__code__.co_varnames)
+    code           = func.__code__
+    args           = getattr(func, '__varnames__', code.co_varnames)
+    kwcount        = getattr(func, '__kwcount__',  code.co_kwonlyargcount)
     defaults       = func.__defaults__ or []
     typehints      = func.__annotations__
     default_dict   = dict(zip(args[-len(defaults):], defaults))
+    default_dict.update(func.__kwdefaults__ or {})
     # determine typehint of arg based on default if not already specified
     for name in (name for name in args if name not in typehints):
         typehints[name] = type(default_dict.get(name, ''))
-    return args, default_dict, typehints
+    # separate args and kwargs
+    kwargs = args[-kwcount:] if kwcount > 0 else []
+    args   = args[:-kwcount] if kwcount > 0 else args
+    return args, kwargs, default_dict, typehints
 
 def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
     """
@@ -83,7 +90,7 @@ def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
         return parse_list_function(func, origin)
     raise ValueError(f'{attr!r} uses an unsupported typehint: {hint}')
 
-def compile_command_values(
+def compile_command_arg_validator(
     names: List[str],
     hints: List[Any],
     funcs: List[TypeFunc]
@@ -120,6 +127,50 @@ def compile_command_values(
                 )
         return values
     return validate_values
+
+def compile_command_flags(
+    func:     Callable,
+    names:    List[str],
+    hints:    List[Any],
+    funcs:    List[TypeFunc],
+    defaults: Dict[str, Any]
+) -> List[Flag]:
+    """
+    """
+    # parse function doc to search for flag descriptions
+    descriptions, doc = {}, func.__doc__ or ''
+    for line in (line.strip() for line in doc.splitlines()):
+        if not line or not any(line.startswith(c) for c in '@:'):
+            continue
+        # skip if document is not a parameter
+        prefix  = line[0]
+        details = line.strip('@:').strip().split(' ', 2)
+        if details[0].lower() != 'param':
+            continue
+        # parse description from line
+        strip        = '@:<{}[]- \t\r'
+        tlbl         = any(details[1].startswith(c) for c in '{<[:')
+        param, usage = details[2].split(' ', 1) if tlbl else tuple(details[1:])
+        # assign param/usage to description table
+        descriptions[param.strip(strip)] = usage.strip(strip)
+    # generate flags
+    flags, shorts = [], []
+    for name, hint, func in zip(names, hints, funcs):
+        # set shortform if first letter is unique
+        fname = name.strip('_')
+        short = fname.lower()[0]
+        shorts.append(short if short not in shorts else '')
+        # generate flag object
+        is_bool = hint == bool
+        flags.append(Flag(
+            name=f'{fname}, {short}' if short else fname,
+            usage=descriptions.get(name),
+            default=defaults.get(name),
+            hidden=name.startswith('_'),
+            type=bool if is_bool else func,
+            has_value=not is_bool,
+        ))
+    return flags
 
 def compile_command_usage(action: Action) -> str:
     """
@@ -158,31 +209,40 @@ def action(func: Callable) -> Action:
     :param func: function being wrapped and converted into command action
     :return:     generated function command action
     """
-    func                      = wrap_async(func)
-    args, defaults, typehints = inspectfunc(func)
+    func                              = wrap_async(func)
+    args, kwargs, defaults, typehints = inspectfunc(func)
     # generate argument type converters/validators
-    typelist        = [typehints[name] for name in args]
-    funclist        = [compile_typehint(name, typehints[name]) for name in args]
-    validate_values = compile_command_values(args, typelist, funclist)
+    argtypes      = [typehints[name] for name in args]
+    arglist       = [compile_typehint(name, typehints[name]) for name in args]
+    validate_args = compile_command_arg_validator(args, argtypes, arglist)
+    # fill out any flag fields w/ their associated data
+    ftypes = [typehints[name] for name in kwargs]
+    flist  = [compile_typehint(name, typehints[name]) for name in kwargs]
+    flags  = compile_command_flags(func, kwargs, ftypes, flist, defaults)
     # generate argument number validator
-    max_args        = len([f for f in funclist if f])
-    arg_diff        = len(funclist) - max_args
-    max_args        = len([f for f in funclist if f])
+    max_args        = sum(1 for func in arglist if func is not None)
+    arg_diff        = len(arglist) - max_args
+    max_args        = len([f for f in arglist if f])
     min_args        = sum(1 for a in args if a not in defaults) - arg_diff
     validate_argnum = range_args(min_args, max_args)
     # complete action translation
     @functools.wraps(func)
     async def action(ctx: Context):
         validate_argnum(ctx)
-        return await func(*validate_values(ctx))
+        args   = validate_args(ctx)
+        names  = (flag.names[0] for flag in flags)
+        kwargs = {name:ctx.get(name) for name in names}
+        return await func(*args, **kwargs)
     # export a few variables for command generation
+    action.flags     = flags
     action.defaults  = defaults
-    action.arguments = [arg for n, arg in enumerate(args, 0) if funclist[n]]
+    action.arguments = [arg for n, arg in enumerate(args, 0) if arglist[n]]
     # return generated action function
     return action
 
 def command(
     parent:    Command,
+    name:      Optional[str]  = None,
     aliases:   Optional[list] = None,
     usage:     Optional[str]  = None,
     argsusage: Optional[str]  = None,
@@ -192,6 +252,7 @@ def command(
     """
     dynamically generate a cli-command from the decorated function
 
+    :param name:      name override for command
     :param aliases:   name aliases assigned to command
     :param usage:     specified command usage description
     :param argsusage: specified command argsusage description
@@ -203,13 +264,14 @@ def command(
         fname   = func.__name__
         main    = action(func)
         command = Command(
-            name=fname.strip('_'),
+            name=name or fname.strip('_'),
             aliases=aliases or [],
             category=category,
             usage=usage or compile_command_usage(main),
             argsusage=argsusage or compile_command_argsusage(main),
             hidden=fname.startswith('_') if hidden is None else hidden,
             action=main,
+            flags=main.flags,
         )
         parent.commands.append(command)
         return command
@@ -251,5 +313,6 @@ def app(
             email=email,
             copyright=copyright,
             action=main,
+            flags=main.flags,
         )
     return decorator
