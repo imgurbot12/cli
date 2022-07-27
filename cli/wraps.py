@@ -1,6 +1,7 @@
 """
 Function Command Wrapper Utilities
 """
+import inspect
 import functools
 from typing import *
 from datetime import timedelta
@@ -40,21 +41,16 @@ def inspectfunc(func: Callable) -> Tuple[list, dict, dict]:
     :param func: function being inspected for argument details
     :return:     (list of args, list of kwargs, defaults-dict, typehint-dict)
     """
-    # retrieve args from __varnames__ if func was run through `wrap_async`
-    code           = func.__code__
-    args           = getattr(func, '__varnames__', code.co_varnames)
-    kwcount        = getattr(func, '__kwcount__',  code.co_kwonlyargcount)
-    defaults       = func.__defaults__ or []
-    typehints      = func.__annotations__
-    default_dict   = dict(zip(args[-len(defaults):], defaults))
-    default_dict.update(func.__kwdefaults__ or {})
+    sig       = inspect.signature(func)
+    params    = sig.parameters.values()
+    args      = [p.name for p in params if p.kind == p.POSITIONAL_OR_KEYWORD]
+    kwargs    = [p.name for p in params if p.kind == p.KEYWORD_ONLY]
+    defaults  = {p.name:p.default for p in params if p.default != p.empty}
+    typehints = {p.name:p.annotation for p in params if p.annotation != p.empty}
     # determine typehint of arg based on default if not already specified
     for name in (name for name in args if name not in typehints):
-        typehints[name] = type(default_dict.get(name, ''))
-    # separate args and kwargs
-    kwargs = args[-kwcount:] if kwcount > 0 else []
-    args   = args[:-kwcount] if kwcount > 0 else args
-    return args, kwargs, default_dict, typehints
+        typehints[name] = type(defaults.get(name, ''))
+    return args, kwargs, defaults, typehints
 
 def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
     """
@@ -159,7 +155,8 @@ def compile_command_flags(
         # set shortform if first letter is unique
         fname = name.strip('_')
         short = fname.lower()[0]
-        shorts.append(short if short not in shorts else '')
+        short = short if short not in shorts else ''
+        shorts.append(short)
         # generate flag object
         is_bool = hint == bool
         flags.append(Flag(
