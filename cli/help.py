@@ -62,7 +62,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage }}
+    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -73,7 +73,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage }}
+    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 
@@ -107,7 +107,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage }}
+    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -118,7 +118,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage }}
+    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 """
@@ -173,8 +173,9 @@ def help_action(ctx: Context, command: Optional[Command] = None):
     print(jtemplate.render(**kwargs), file=ctx.app.writer)
 
 #** Init **#
-env.filters['buffer'] = jinja_buffer
-env.globals['calc_buffer'] = jinja_calc_buffer
+env.filters['buffer']        = jinja_buffer
+env.globals['calc_buffer']   = jinja_calc_buffer
+env.globals['default_usage'] = 'no usage given'
 
 #: primary flag to open app help-page
 help_flag = BoolFlag(name='help, h', usage='shows main help')

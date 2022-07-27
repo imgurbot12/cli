@@ -9,7 +9,19 @@ from .command import CommandBase, Command
 from .help import help_flag, help_action
 
 #** Variables **#
-__all__ = ['run_app']
+__all__ = [
+    'run_app',
+
+    'EX_USAGE',
+    'EX_UNAVAILABLE',
+    'EX_CONFIG'
+]
+
+# exit codes stolen from sysexists.h (/usr/include/sysexits.h)
+EX_USAGE       = 64  #- command line usage error -#
+EX_UNAVAILABLE = 69  #- service unavailable -#
+EX_CONFIG      = 78  #- configuration error -#
+
 
 #** Functions **#
 
@@ -90,6 +102,9 @@ async def run_app(app: 'App', args: List[str]):
     :param args: arguments to parse according to app definition
     """
     try:
+        # validate application configuration before executing
+        app.validate()
+        # evaluate and run commands based on cli data
         (next_cmd, ctx, ret, gflags) = (app, Context(app, app), None, None)
         while next_cmd is not None:
             (cmd, parent) = (next_cmd, ctx)
@@ -116,3 +131,6 @@ async def run_app(app: 'App', args: List[str]):
         app.exit_with_error(ctx, cmd, e.args[0], e.args[1])
     except NotFoundError as e:
         app.not_found_error(ctx, cmd, str(e))
+    except ConfigError as e:
+        print(f'ConfigError: {e}', file=app.err_writer)
+        raise SystemExit(EX_CONFIG)

@@ -7,7 +7,7 @@ from typing import *
 from dataclasses import dataclass, field, InitVar
 
 from .flag import Flags
-from .context import NO_ACTION, Context
+from .context import NO_ACTION, Context, ConfigError
 
 #** Variables **#
 __all__ = [
@@ -33,11 +33,6 @@ def wrap_async(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        # preserve function arguments and defaults in wraps
-        wrapper.__varnames__   = func.__code__.co_varnames
-        wrapper.__kwcount__    = func.__code__.co_kwonlyargcount
-        wrapper.__defaults__   = func.__defaults__
-        wrapper.__kwdefaults__ = func.__kwdefaults__
         return wrapper
     return func
 
@@ -60,26 +55,12 @@ class CommandBase:
         self.run_before = get_action(self, 'before', before)
         self.run_action = get_action(self, 'action', action)
         self.run_after  = get_action(self, 'after',  after)
-        # ensure flag-names dont overlap
-        all_names = set()
-        for flag in self.flags:
-            names = set(flag.names)
-            for name in names:
-                if name in all_names:
-                    raise ValueError(f'flag: {flag.name} name overlaps: {name}')
-            all_names.update(names)
-        # ensure command-names don't overlap
-        cmd_names = set()
-        for cmd in self.commands:
-            names = set([cmd.name, *cmd.aliases])
-            for name in names:
-                if name in cmd_names:
-                    raise ValueError(f'cmd: {cmd.name} name overlaps: {name}')
-            cmd_names.update(names)
 
     @property
     def categories(self) -> Dict[str, 'Command']:
-        """organize commands into categories"""
+        """
+        organize commands into categories
+        """
         categories = {}
         for cmd in self.commands:
             if cmd.category not in categories:
@@ -108,7 +89,9 @@ class CommandBase:
         return commands
 
     def visible_categories(self) -> List[str]:
-        """retrieve category names"""
+        """
+        retrieve category names
+        """
         return [category for category in self.categories.keys()]
 
     async def run_before(self, ctx: Context):
@@ -177,13 +160,41 @@ class CommandBase:
         # otherwise call decorator as normal
         return wraps.command(self, *args, **kwargs)
 
+    def validate(self):
+        """
+        validate command settings before being run
+        """
+        # ensure flag-names dont overlap
+        for n, flag in enumerate(self.flags[::-1], 1):
+            for other in self.flags[:-n]:
+                for name in flag.names:
+                    if name in other.names:
+                        raise ConfigError(
+                            f'command {self.name!r} > '
+                            f'flag {flag.name!r} name overlaps {other.name!r}')
+        # ensure command-names don't overlap
+        for n, cmd in enumerate(self.commands[::-1], 1):
+            for other in self.commands[:-n]:
+                if cmd.name == other.name:
+                    raise ConfigError(
+                        f'command {self.name!r} > '
+                        f'subcmd {cmd.name!r} name overlaps: {other.name!r}')
+                for alias in cmd.aliases:
+                    if alias == other.name or alias in other.aliases:
+                        raise ConfigError(
+                            f'cmd {self.name!r} > subcmd {cmd.name!r} '
+                            f'alias {alias!r} overlaps: {other.name!r}')
+        # validate subcommands as well
+        for cmd in self.commands:
+            cmd.validate()
+
 @dataclass
 class Command(CommandBase):
     """controls specifications and behavior of a cli command"""
 
     name:      str
     aliases:   List[str]       = field(default_factory=list)
-    usage:     str             = 'no usage given'
+    usage:     Optional[str]   = None
     argsusage: Optional[str]   = None
     category:  str             = '*'
     hidden:    bool            = False

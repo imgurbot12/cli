@@ -16,6 +16,7 @@ __all__ = [
     'UsageError',
     'ExitError',
     'NotFoundError',
+    'ConfigError',
     'Args',
     'Context',
 

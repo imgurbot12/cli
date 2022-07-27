@@ -11,7 +11,7 @@ from .flag import Flags
 from .context import Context
 from .command import Action, Commands, CommandBase, Command
 from .help import help_action, help_flag, help_command
-from .parser import run_app
+from .parser import run_app, EX_USAGE, EX_UNAVAILABLE
 
 #** Variables **#
 __all__ = [
@@ -28,7 +28,7 @@ UsageErrorFunc = Callable[[Context, Command, str], None]
 #: definition for exit-error function
 ExitErrorFunc  = Callable[[Context, Command, str, int], None]
 
-#: defintion for command-not-found error
+#: defintion for command-not-found function
 NotFoundFunc = Callable[[Context, Command, str], None]
 
 #** Classes **#
@@ -45,7 +45,7 @@ class App(CommandBase):
     flags:       Flags               = field(default_factory=list, repr=False)
     commands:    Commands            = field(default_factory=list, repr=False)
 
-    authors:   List[str]     = field(default_factory=list)  
+    authors:   List[str]     = field(default_factory=list)
     email:     Optional[str] = None
     copyright: Optional[str] = None
 
@@ -66,9 +66,9 @@ class App(CommandBase):
     run_async: bool = False
 
     def __post_init__(self,
-        before: Action,
-        action: Action,
-        after:  Action,
+        before:          Action,
+        action:          Action,
+        after:           Action,
         on_usage_error:  UsageErrorFunc,
         exit_with_error: ExitErrorFunc,
         not_found_error: NotFoundFunc,
@@ -83,24 +83,43 @@ class App(CommandBase):
         self.commands.insert(0, help_command)
 
     def on_usage_error(ctx: Context, cmd: Command, error: str):
-        """handles usage errors during parsing or from context"""
+        """
+        handles usage errors during parsing or from context
+
+        :param ctx: context of command that raised a usage error
+        :param cmd: command that raised a usage error
+        :param err: message of usage error raised
+        """
         print(f'Incorrect Usage: {error}\n', file=ctx.app.err_writer)
         help_action(ctx, cmd)
-        raise SystemExit(4)
+        raise SystemExit(EX_USAGE)
 
     def exit_with_error(ctx: Context, cmd: Command, err: str, code: int):
-        """handles unrecoverable exceptions that must lead to complete exit"""
+        """
+        handles unrecoverable exceptions that must lead to complete exit
+
+        :param ctx:  context of command that raised an exit error
+        :param cmd:  command that raised an exit error
+        :param err:  message of exit error
+        :param code: exit-code of exit error
+        """
         print(f"App-Error: {err}", file=ctx.app.err_writer)
         raise SystemExit(code)
 
     def not_found_error(ctx: Context, cmd: Command, arg: str):
-        """handles issues with invalid flags and bad command paths on help"""
+        """
+        handles issues with invalid flags and bad command paths on help
+
+        :param ctx: context of command that raised a not-found error
+        :param cmd: command that raised a not found error
+        :param arg: argument that was not found
+        """
         if arg.startswith('-'):
             msg = f'Command: {cmd.name}, Invalid Flag: {arg}'
         else:
             msg = f'No Help topic for: {arg}'
         print(msg, file=ctx.app.err_writer)
-        raise SystemExit(3)
+        raise SystemExit(EX_UNAVAILABLE)
 
     def run(self, args: List[str] = sys.argv) -> Optional[asyncio.Future]:
         """

@@ -14,6 +14,7 @@ __all__ = [
     'UsageError',
     'ExitError',
     'NotFoundError',
+    'ConfigError',
 
     'Args',
     'Context',
@@ -35,6 +36,9 @@ class ExitError(Exception):
 
 class NotFoundError(Exception):
     """raise error when app gets flag it doesnt recognize"""
+
+class ConfigError(ValueError):
+    """raise error when app is improperly configured"""
 
 #** Classes **#
 
