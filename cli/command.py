@@ -192,14 +192,15 @@ class CommandBase:
 class Command(CommandBase):
     """controls specifications and behavior of a cli command"""
 
-    name:      str
-    aliases:   List[str]       = field(default_factory=list)
-    usage:     Optional[str]   = None
-    argsusage: Optional[str]   = None
-    category:  str             = '*'
-    hidden:    bool            = False
-    flags:     Flags           = field(default_factory=list, repr=False)
-    commands:  Commands        = field(default_factory=list, repr=False)
+    name:         str
+    aliases:      List[str]     = field(default_factory=list)
+    usage:        Optional[str] = None
+    argsusage:    Optional[str] = None
+    category:     str           = '*'
+    hidden:       bool          = False
+    flags:        Flags         = field(default_factory=list, repr=False)
+    commands:     Commands      = field(default_factory=list, repr=False)
+    allow_parent: bool          = False
 
     before: InitVar[Action]
     action: InitVar[Action]

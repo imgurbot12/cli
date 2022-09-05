@@ -94,6 +94,15 @@ def parse_flags(flags: Flags, args: Args) -> FlagDict:
     # return parsed values
     return fdict
 
+def has_help_flag(gflags: dict) -> bool:
+    """
+    check if the given global flags contain the help flag
+
+    :param gflags: parsed global flags
+    :return:       true if `help` flag is found
+    """
+    return bool(gflags.get(help_flag.names[0]))
+
 async def run_app(app: 'App', args: List[str]):
     """
     iterate args until given commands and correlated flags are executed
@@ -116,11 +125,13 @@ async def run_app(app: 'App', args: List[str]):
             if gflags is None:
                 gflags = flags
             ctx = Context(app, cmd, parent, gflags, flags, Args(values))
-            await cmd.run_before(ctx)
-            ret = await cmd.run_action(ctx)
-            await cmd.run_after(ctx)
+            # only run command if no subcommand is present or parent is allowed
+            if (next_cmd is None and not has_help_flag(gflags)) or cmd.allow_parent:
+                await cmd.run_before(ctx)
+                ret = await cmd.run_action(ctx)
+                await cmd.run_after(ctx)
         # raise help if help-flag was given
-        if gflags.get(help_flag.names[0]):
+        if has_help_flag(gflags):
             help_action(ctx, cmd)
         # raise help if no action was taken at all
         elif ret == NO_ACTION:

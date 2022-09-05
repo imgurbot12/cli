@@ -37,13 +37,14 @@ NotFoundFunc = Callable[[Context, Command, str], None]
 class App(CommandBase):
     """application determines handling of arguments and stores metadata"""
 
-    name:        str
-    usage:       str
-    version:     str                 = '0.0.1'
-    argsusage:   Optional[str]       = None
-    description: Optional[str]       = None
-    flags:       Flags               = field(default_factory=list, repr=False)
-    commands:    Commands            = field(default_factory=list, repr=False)
+    name:         str
+    usage:        str
+    version:      str           = '0.0.1'
+    argsusage:    Optional[str] = None
+    description:  Optional[str] = None
+    flags:        Flags         = field(default_factory=list, repr=False)
+    commands:     Commands      = field(default_factory=list, repr=False)
+    allow_parent: bool          = False
 
     authors:   List[str]     = field(default_factory=list)
     email:     Optional[str] = None

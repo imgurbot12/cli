@@ -227,35 +227,37 @@ def action(func: Callable) -> Action:
     async def action(ctx: Context):
         validate_argnum(ctx)
         args   = validate_args(ctx)
-        names  = (flag.names[0] for flag in flags)
+        names  = [flag.names[0] for flag in flags]
         kwargs = {name:ctx.get(name) for name in names}
         return await func(*args, **kwargs)
     # export a few variables for command generation
-    action.flags     = flags
+    action.flags     = flags.copy()
     action.defaults  = defaults
     action.arguments = [arg for n, arg in enumerate(args, 0) if arglist[n]]
     # return generated action function
     return action
 
 def command(
-    parent:    Command,
-    name:      Optional[str]  = None,
-    aliases:   Optional[list] = None,
-    usage:     Optional[str]  = None,
-    argsusage: Optional[str]  = None,
-    category:  str            = '*',
-    hidden:    Optional[bool] = None,
+    parent:       Command,
+    name:         Optional[str]  = None,
+    aliases:      Optional[list] = None,
+    usage:        Optional[str]  = None,
+    argsusage:    Optional[str]  = None,
+    category:     str            = '*',
+    hidden:       Optional[bool] = None,
+    allow_parent: bool           = False
 ):
     """
     dynamically generate a cli-command from the decorated function
 
-    :param name:      name override for command
-    :param aliases:   name aliases assigned to command
-    :param usage:     specified command usage description
-    :param argsusage: specified command argsusage description
-    :param category:  command category assignment
-    :param hidden:    control if command is hidden from help
-    :return:          decorator that returns generated command object
+    :param name:         name override for command
+    :param aliases:      name aliases assigned to command
+    :param usage:        specified command usage description
+    :param argsusage:    specified command argsusage description
+    :param category:     command category assignment
+    :param hidden:       control if command is hidden from help
+    :param allow_parent: allow parent to run if subcommand is also run
+    :return:             decorator that returns generated command object
     """
     def decorator(func: Callable) -> Command:
         fname   = func.__name__
@@ -267,6 +269,7 @@ def command(
             usage=usage or compile_command_usage(main),
             argsusage=argsusage or compile_command_argsusage(main),
             hidden=fname.startswith('_') if hidden is None else hidden,
+            allow_parent=allow_parent,
             action=main,
             flags=main.flags,
         )
@@ -275,27 +278,29 @@ def command(
     return decorator
 
 def app(
-    name:        Optional[str]  = None,
-    usage:       Optional[str]  = None,
-    version:     Optional[str]  = None,
-    argsusage:   Optional[str]  = None,
-    description: Optional[str]  = None,
-    email:       Optional[str]  = None,
-    authors:     Optional[list] = None,
-    copyright:   Optional[str]  = None,
+    name:         Optional[str]  = None,
+    usage:        Optional[str]  = None,
+    version:      Optional[str]  = None,
+    argsusage:    Optional[str]  = None,
+    description:  Optional[str]  = None,
+    email:        Optional[str]  = None,
+    authors:      Optional[list] = None,
+    copyright:    Optional[str]  = None,
+    allow_parent: bool           = False
 ) -> App:
     """
     dynamically generate a simple cli-application from the decorated function
 
-    :param name:        assigned name of application
-    :param usage:       specified application usage description
-    :param version:     symantic version of application
-    :param argsusage:   specified application argsusage description
-    :param description: detailed description of application
-    :param email:       primary email associated w/ application
-    :param authors:     list of authors associated w/ application
-    :param copyright:   copyright linked with application
-    :return:            decorator that returns generated application object
+    :param name:         assigned name of application
+    :param usage:        specified application usage description
+    :param version:      symantic version of application
+    :param argsusage:    specified application argsusage description
+    :param description:  detailed description of application
+    :param email:        primary email associated w/ application
+    :param authors:      list of authors associated w/ application
+    :param copyright:    copyright linked with application
+    :param allow_parent: allow base parent app to run when child command is run
+    :return:             decorator that returns generated application object
     """
     def decorator(func: Callable) -> App:
         cname = name or func.__name__.strip('_')
@@ -309,6 +314,7 @@ def app(
             authors=authors or [],
             email=email,
             copyright=copyright,
+            allow_parent=allow_parent,
             action=main,
             flags=main.flags,
         )
