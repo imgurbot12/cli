@@ -5,7 +5,7 @@ cli
 [![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
 [![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
 
-I was tired of lookin for a cli library powerful enough for what I needed along with
+I was tired of looking for a cli library powerful enough for what I needed along with
 support for subcommands so instead I wrote my own taking inspiration from an 
 [existing library](https://github.com/urfave/cli) in golang.
 
@@ -14,6 +14,13 @@ CLI is a simple, fast, and efficient library to control your command line applic
 <!-- toc -->
 
 - [Overview](#Overview)
+- [Installation](#Installation)
+- [Supported Platforms](#Supported-Platforms)
+- [Getting Started](#Getting-Started)
+- [Flags](#Flags)
+- [Commands](#Commands)
+- [Command Categories](#Command-Categories)
+- [Exit Code](#Exit-Code)
 
 <!-- tocstop -->
 
@@ -37,7 +44,7 @@ To install the library just run:
 $ pip3 install git+https://github.com/imgurbot12/cli.git
 ```
 
-# Support Platforms
+# Support-Platforms
 
 CLI is supported and tested on various versions of Python and Linux and MacOS.
 Tests have yet to be done on windows but _should_ run without issue.
@@ -123,7 +130,7 @@ help page as well.
 
 # Commands
 
-Subcommands can also be defined for a more git-line interface.
+Subcommands can also be defined for a more git-like interface.
 
 ```python
 import cli
@@ -155,5 +162,79 @@ def hola(name: str = 'extraño'):
 app.run()
 ```
 
+# Command-Categories
+
+For additional organization in apps that have many subcommands, you
+can associate a category for each command to group them together in
+the help output.
+
+E.g.
+
+```python
+import cli
+
+app = cli.App(
+  name='Hello World!',
+  usage='Greet the World!',
+  version='0.0.1',
+)
+
+@app.command(category='Greeting')
+def hello(name: str = 'Stranger'):
+  """
+  Greet the World in English!
+
+  :param name: name of person to greet
+  """
+  print(f'Hello {name}!')
+
+@app.command(category='Greeting')
+def hola(name: str = 'extraño'):
+  """
+  Greet the World in Spanish!
+
+  :param name: name of person to greet
+  """
+  print(f'Hola {name}!')
+
+@app.command()
+def foo(bar: str = 'bar'):
+  """
+  foobar
+  """
+  print(f'bar: {bar!r}')
+
+app.run()
+```
+
+Will include:
+
+```
+COMMANDS:
+    help, h - shows help for a command
+    foo     - foobar
+
+    Greeting:
+        hello - Greet the World in English!
+        hola  - Greet the World in Spanish!
+```
+
+# Exit-Code
+
+Calling `app.run` will not automatically call `sys.exit`, which means that by
+default the exit code will "fall through" to being `0`. An explicit code may
+be set by returning a non-null error e.g.
+
+```
+import cli
+
+@cli.app()
+def fail(ctx: cli.Context, *, fail: bool = False):
+  if fail:
+    ctx.exit_with_error('doing a fail!', 80)
+  print('exited without a fail!')
+
+fail.run()
+```
 
 
