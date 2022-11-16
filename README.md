@@ -23,7 +23,7 @@ $ pip install cli3
 
 ## Documentation
 
-More documentation is available in [`./docs`](./docs) or the hosted
+More documentation is available in [`./docs`](https://github.com/imgurbot12/cli/tree/master/docs) or the hosted
 documentation site at <https://cli3.readthedocs.org>.
 
 ## License
