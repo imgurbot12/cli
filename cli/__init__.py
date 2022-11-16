@@ -13,13 +13,11 @@ __all__ = [
     'Commands',
     'Command',
 
-    'range_args',
-    'exact_args',
-    'no_args',
-
+    'CliError',
     'UsageError',
     'ExitError',
     'NotFoundError',
+    'ConfigError',
     'Args',
     'Context',
 
@@ -33,11 +31,24 @@ __all__ = [
     'ListFlag',
     'DurationFlag',
     'EnumFlag',
+    'FilePathFlag',
 
     'run_app',
 
     'help_app_template',
     'help_cmd_template',
+
+    'range_args',
+    'exact_args',
+    'no_args',
+
+    'Decimal',
+    'Duration',
+    'NewFile',
+    'ExistingFile',
+
+    'app',
+    'action',
 ]
 
 #** Imports **#
@@ -47,3 +58,5 @@ from .context import *
 from .command import *
 from .parser import *
 from .help import *
+from .wraps import *
+from .argument import *

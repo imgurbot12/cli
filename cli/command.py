@@ -2,22 +2,17 @@
 single command defintions used as part of application definition
 """
 import asyncio
-from functools import wraps
+import functools
+from typing import *
 from dataclasses import dataclass, field, InitVar
-from typing import Callable, Optional, List, Dict
 
 from .flag import Flags
-from .context import NO_ACTION, Context
+from .context import NO_ACTION, Context, ConfigError
 
 #** Variables **#
 __all__ = [
     'Action',
     'Commands',
-
-    'range_args',
-    'exact_args',
-    'no_args',
-
     'CommandBase',
     'Command'
 ]
@@ -30,46 +25,23 @@ Commands = List['Command']
 
 #** Functions **#
 
-def _wraps(func: Callable) -> Callable:
+#TODO: run sync cli things in event executor?
+
+def wrap_async(func: Callable) -> Callable:
     """ensure actions are run async"""
     if not asyncio.iscoroutinefunction(func):
-        @wraps(func)
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
     return func
 
-def range_args(min: int = 0, max: Optional[int] = None) -> Action:
-    """
-    generate before action function to validate the number of arguments
-
-    :param min: minimum number of arguments
-    :param max: maximum number of arguments
-    :return:    function used to regulate argument numbers
-    """
-    def validate_range_args(ctx: Context):
-        if min < 0 and len(ctx.args) > 0:
-            ctx.on_usage_error('action does not take any arguments')
-        if min > 0 and len(ctx.args) < min:
-            ctx.on_usage_error(f'action must have at least {min} arguments')
-        if max and len(ctx.args) > max:
-            ctx.on_usage_error(f'action can have at maximum {max} arguments')
-    return validate_range_args
-
-def exact_args(num: int) -> Action:
-    """
-    generate before action function to validate the exact of arguments
-
-    :param num: number of allowed arguments
-    :return:    function used to regulate argument numbers
-    """
-    def validate_exact_args(ctx: Context):
-        if len(ctx.args) != num:
-            ctx.on_usage_error(f'action must have exactly {num} arguments')
-    return validate_exact_args
-
-#: public action validator to ensure no arguments are passed
-no_args = range_args(-1)
+def get_action(obj: object, name: str, func: Optional[Callable]) -> Callable:
+    """ensure action assignment is not pulled from command-base default"""
+    if not func or func is getattr(CommandBase, name):
+        func = getattr(obj, f'run_{name}')
+        return wrap_async(func)
+    return wrap_async(func)
 
 #** Classes **#
 
@@ -80,29 +52,15 @@ class CommandBase:
 
     def __post_init__(self, before: Action, action: Action, after: Action):
         """value validation to ensure correctness"""
-        self.before = _wraps(before or self.before)
-        self.action = _wraps(action or self.action)
-        self.after  = _wraps(after  or self.after)
-        # ensure flag-names dont overlap
-        all_names = set()
-        for flag in self.flags:
-            names = set(flag.names)
-            for name in names:
-                if name in all_names:
-                    raise ValueError(f'flag: {flag.name} name overlaps: {name}')
-            all_names.update(names)
-        # ensure command-names don't overlap
-        cmd_names = set()
-        for cmd in self.commands:
-            names = set([cmd.name, *cmd.aliases])
-            for name in names:
-                if name in cmd_names:
-                    raise ValueError(f'cmd: {cmd.name} name overlaps: {name}')
-            cmd_names.update(names)
+        self.run_before = get_action(self, 'before', before)
+        self.run_action = get_action(self, 'action', action)
+        self.run_after  = get_action(self, 'after',  after)
 
     @property
     def categories(self) -> Dict[str, 'Command']:
-        """organize commands into categories"""
+        """
+        organize commands into categories
+        """
         categories = {}
         for cmd in self.commands:
             if cmd.category not in categories:
@@ -131,34 +89,137 @@ class CommandBase:
         return commands
 
     def visible_categories(self) -> List[str]:
-        """retrieve category names"""
+        """
+        retrieve category names
+        """
         return [category for category in self.categories.keys()]
 
-    async def before(ctx: Context):
+    async def run_before(self, ctx: Context):
         """default before command function"""
+        pass
 
-    async def action(ctx: Context):
+    async def run_action(self, ctx: Context):
         """default action command function"""
         return NO_ACTION
 
-    async def after(ctx: Context):
+    async def run_after(self, ctx: Context):
         """default after command function"""
+        pass
+
+    def before(self, func: Callable) -> Action:
+        """
+        decorate the specified function and assign to command `before` action
+
+        :param func: function being assigned to before function
+        :return:     wrapped before function
+        """
+        self.run_before = wrap_async(func)
+        return self.run_before
+
+    def action(self, func: Callable) -> Action:
+        """
+        decorate the specified function and assign to command action
+
+        :param func: function being assigned to action function
+        :return:     wrapped action function
+        """
+        from . import wraps
+        # preserve original flags
+        if not hasattr(self, 'original_flags'):
+            self.original_flags = self.flags
+        # generate new action
+        action = wraps.action(func)
+        # save changes to command
+        self.flags      = [*self.original_flags, *action.flags]
+        self.run_action = action
+        return self.run_action
+
+    def after(self, func: Callable) -> Action:
+        """
+        decorate the specified function and assign to command `after` action
+
+        :param func: function being assigned to after function
+        :return:     wrapped after function
+        """
+        self.run_after = wrap_async(func)
+        return self.run_after
+
+    def command(self, *args: Any, **kwargs: Any) -> 'Command':
+        """
+        add the specified function as a subcommand to the current parent
+
+        :param args:   positional arguments to pass to command wrapping
+        :param kwargs: keyword arguments to pass to command wrapping
+        :return:       newly wrapped command object attached to parent
+        """
+        from . import wraps
+        # allow decorator to act as normal wrapper without any args
+        if not kwargs and len(args) == 1 and callable(args[0]):
+            decorator = wraps.command(self)
+            return decorator(args[0])
+        # otherwise call decorator as normal
+        return wraps.command(self, *args, **kwargs)
+
+    def validate(self):
+        """
+        validate command settings before being run
+        """
+        # ensure flag-names dont overlap
+        for n, flag in enumerate(self.flags[::-1], 1):
+            for other in self.flags[:-n]:
+                for name in flag.names:
+                    if name in other.names:
+                        raise ConfigError(
+                            f'command {self.name!r} > '
+                            f'flag {flag.name!r} name overlaps {other.name!r}')
+        # ensure command-names don't overlap
+        for n, cmd in enumerate(self.commands[::-1], 1):
+            for other in self.commands[:-n]:
+                if cmd.name == other.name:
+                    raise ConfigError(
+                        f'command {self.name!r} > '
+                        f'subcmd {cmd.name!r} name overlaps: {other.name!r}')
+                for alias in cmd.aliases:
+                    if alias == other.name or alias in other.aliases:
+                        raise ConfigError(
+                            f'cmd {self.name!r} > subcmd {cmd.name!r} '
+                            f'alias {alias!r} overlaps: {other.name!r}')
+        # validate subcommands as well
+        for cmd in self.commands:
+            cmd.validate()
 
 @dataclass
 class Command(CommandBase):
-    """controls specifications and behavior of a cli command"""
+    """
+    controls specifications and behavior of a cli command
+    
+    :param name:         name of command
+    :param aliases:      name aliases for command
+    :param usage:        usage description 
+    :param argsusage:    argument usage description
+    :param category:     assigned command category
+    :param hidden:       hide command in help if true
+    :param flags:        configured command flags
+    :param commands:     configured subcommands of command
+    :param allow_parent: allow parent to run on child command run
+    :param before:       command before-action function
+    :param action:       command action function
+    :param after:        command after-action function
+    """
 
-    name:      str
-    aliases:   List[str]     = field(default_factory=list)
-    usage:     str           = 'no usage given'
-    argsusage: Optional[str] = None
-    category:  str           = '*'
-    hidden:    bool          = False
-    flags:     Flags         = field(default_factory=list, repr=False)
-    commands:  Commands      = field(default_factory=list, repr=False)
-    before:    InitVar[Action]
-    action:    InitVar[Action]
-    after:     InitVar[Action]
+    name:         str
+    aliases:      List[str]     = field(default_factory=list)
+    usage:        Optional[str] = None
+    argsusage:    Optional[str] = None
+    category:     str           = '*'
+    hidden:       bool          = False
+    flags:        Flags         = field(default_factory=list, repr=False)
+    commands:     Commands      = field(default_factory=list, repr=False)
+    allow_parent: bool          = False
+
+    before: InitVar[Action]
+    action: InitVar[Action]
+    after:  InitVar[Action]
 
     def to_string(self):
         """convert command names/alises to string for help formatting"""

@@ -25,9 +25,12 @@ NAME:
     {{name}}{%if usage%} - {{usage}}{%endif%}
 
 USAGE:
-    {% if visible_flags %}[global flags]{% endif %}
-    {%- if commands %} command [command flags]{% endif %}
-    {%- if argsusage %} {{ argsusage }}{% else %} [arguments...]{% endif %}
+    {% if argsusage -%}
+        {{ argsusage }}
+    {%- else -%}
+        {%- if visible_flags %}[global flags]{% endif %}
+        {%- if visible_commands %} [command] [command flags]{% endif %}
+    {%- endif %}
 
 VERSION:
     {{ version }}
@@ -49,7 +52,7 @@ AUTHOR{%if authors|length > 1%}S{%endif%}:
 {%- if visible_commands %}
 
 COMMANDS:
-    {%-for category in visible_categories%}
+    {%- for category in visible_categories %}
         {%- set cbuffer = calc_buffer(visible_commands, category) %}
         {%- set active_category = category and category != "*" %}
         {%- if active_category %}
@@ -59,7 +62,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage }}
+    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -70,7 +73,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage }}
+    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 
@@ -83,7 +86,13 @@ COPYRIGHT:
 
 help_cmd_template = """
 NAME:
-    {{name}}{%if usage%} - {{usage}}{%endif%}
+    {{name}}{% if usage %} - {{ usage }}{% endif %}
+
+{%- if argsusage %}
+
+USAGE:
+    {{ name }} {{ argsusage }}
+{%- endif %}
 
 {%- if visible_commands %}
 
@@ -98,7 +107,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage }}
+    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -109,7 +118,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage }}
+    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 """
@@ -164,8 +173,9 @@ def help_action(ctx: Context, command: Optional[Command] = None):
     print(jtemplate.render(**kwargs), file=ctx.app.writer)
 
 #** Init **#
-env.filters['buffer'] = jinja_buffer
-env.globals['calc_buffer'] = jinja_calc_buffer
+env.filters['buffer']        = jinja_buffer
+env.globals['calc_buffer']   = jinja_calc_buffer
+env.globals['default_usage'] = 'no usage given'
 
 #: primary flag to open app help-page
 help_flag = BoolFlag(name='help, h', usage='shows main help')

@@ -11,9 +11,11 @@ __all__ = [
     'FlagDict',
     'NO_ACTION',
 
+    'CliError',
     'UsageError',
     'ExitError',
     'NotFoundError',
+    'ConfigError',
 
     'Args',
     'Context',
@@ -27,14 +29,21 @@ NO_ACTION = 'NO_COMMAND_ACTION_TAKEN'
 
 #** Exceptions **#
 
-class UsageError(Exception):
+class CliError(Exception):
+    """baseclass for all cli internal exceptions"""
+    pass
+
+class UsageError(CliError):
     """raise error during usage issue"""
 
-class ExitError(Exception):
+class ExitError(CliError):
     """raise error when app must exit"""
 
-class NotFoundError(Exception):
+class NotFoundError(CliError):
     """raise error when app gets flag it doesnt recognize"""
+
+class ConfigError(CliError):
+    """raise error when app is improperly configured"""
 
 #** Classes **#
 
