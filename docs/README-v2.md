@@ -226,7 +226,7 @@ Calling `app.run` will not automatically call `sys.exit`, which means that by
 default the exit code will "fall through" to being `0`. An explicit code may
 be set by returning a non-null error e.g.
 
-```
+```python
 import cli
 
 @cli.app()
