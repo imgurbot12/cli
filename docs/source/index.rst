@@ -16,7 +16,7 @@ Installation
 ****************
 The current release of pypub is available through pip:
 
-    $ pip install cli
+    $ pip install cli3
 
 ****************
 Documentation

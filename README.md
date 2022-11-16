@@ -6,7 +6,7 @@ cli
 [![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
 
 A highly configurable, dynamic, fast, and easy solution to managing
-our command-line application. The goal is to make cli development as simple
+a command-line application. The goal is to make cli development as simple
 and effective as possible for any configuration enabling the developer to
 focus on function over form.
 
@@ -18,13 +18,13 @@ so credit to them for their work as well.
 ## Install
 
 ```bash
-$ pip install cli
+$ pip install cli3
 ```
 
 ## Documentation
 
 More documentation is available in [`./docs`](./docs) or the hosted
-documentation site at <https://cli.readthedocs.org>.
+documentation site at <https://cli3.readthedocs.org>.
 
 ## License
 

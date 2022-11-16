@@ -1,16 +1,27 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+with open('README.md', 'r') as f:
+    readme = f.read()
 
 setup(
-    name='cli',
+    name='cli3',
     version='1.0.0',
-    packages=['cli'],
+    license='MIT',
+    packages=find_packages(),
     url='https://github.com/imgurbot12/cli',
-    license='MIT License',
-    author='imgurbot12',
+    author='Andrew Scott',
     author_email='imgurbot12@gmail.com',
     description=(
-        'A simple, fast, and fun package '
-        'for building command line apps in Python'
+        'A highly configurable, dynamic, fast, and easy '
+        'solution to managing a command-line application.'
     ),
-    install_requires=['jinja2']
+    python_requires='>=3.7',
+    long_description=readme,
+    long_description_content_type="text/markdown",
+    install_requires=['jinja2'],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ]
 )
