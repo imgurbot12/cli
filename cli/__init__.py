@@ -13,6 +13,7 @@ __all__ = [
     'Commands',
     'Command',
 
+    'CliError',
     'UsageError',
     'ExitError',
     'NotFoundError',

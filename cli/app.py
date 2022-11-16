@@ -129,8 +129,8 @@ class App(CommandBase):
         :param args: arguments being parsed and passed into relevant actions
         :return:     asyncio.Future if run_async=True
         """
-        loop   = asyncio.get_event_loop()
-        future = asyncio.ensure_future(run_app(self, args))
+        loop   = asyncio.get_event_loop_policy().get_event_loop()
+        future = asyncio.ensure_future(run_app(self, args), loop=loop)
         if self.run_async:
             return future
         loop.run_until_complete(future)

@@ -22,7 +22,6 @@ EX_USAGE       = 64  #- command line usage error -#
 EX_UNAVAILABLE = 69  #- service unavailable -#
 EX_CONFIG      = 78  #- configuration error -#
 
-
 #** Functions **#
 
 def split_arguments(

@@ -101,7 +101,7 @@ def compile_command_arg_validator(
     """
     def validate_values(ctx: Context) -> List[Any]:
         values, tracked = [], 0
-        for n, (name, hint, func) in enumerate(zip(names, hints, funcs), 1):
+        for (name, hint, func) in zip(names, hints, funcs):
             # pass context in if hint is for context
             if hint == Context:
                 values.append(ctx)
@@ -139,7 +139,6 @@ def compile_command_flags(
         if not line or not any(line.startswith(c) for c in '@:'):
             continue
         # skip if document is not a parameter
-        prefix  = line[0]
         details = line.strip('@:').strip().split(' ', 2)
         if details[0].lower() != 'param':
             continue

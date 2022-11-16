@@ -1,7 +1,6 @@
 """
 argument parsers and implementations for special types
 """
-import io
 import os
 import re
 from typing import *
@@ -119,6 +118,8 @@ def range_args(min: int = 0, max: Optional[int] = None) -> Callable:
     def validate_range_args(ctx: 'Context'):
         if min < 0 and len(ctx.args) > 0:
             ctx.on_usage_error('action does not take any arguments')
+        if min > 0 and min == max and len(ctx.args) != min:
+            ctx.on_usage_error(f'action must have exactly {min} arguments')
         if min > 0 and len(ctx.args) < min:
             ctx.on_usage_error(f'action must have at least {min} arguments')
         if max and len(ctx.args) > max:
@@ -132,10 +133,7 @@ def exact_args(num: int) -> Callable:
     :param num: number of allowed arguments
     :return:    function used to regulate argument numbers
     """
-    def validate_exact_args(ctx: 'Context'):
-        if len(ctx.args) != num:
-            ctx.on_usage_error(f'action must have exactly {num} arguments')
-    return validate_exact_args
+    return range_args(num, num)
 
 #: public action validator to ensure no arguments are passed
 no_args = range_args(-1)
