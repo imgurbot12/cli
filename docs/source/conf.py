@@ -22,12 +22,34 @@ extensions = [
     'sphinx_autodoc_typehints',
 ]
 
-napoleon_google_docstring = False
-napoleon_use_param = False
-napoleon_use_ivar = True
-
 templates_path = ['_templates']
 exclude_patterns = []
+
+latex_documents = [(
+    'index', 
+    'cli3.tex', 
+    'cli3 Documentation',
+    'Andrew Scott', 
+    'manual',
+)]
+
+man_pages=[(
+    'index', 
+    'cli3', 
+    'cli3 Documentation',
+    ['Andrew Scott', ], 
+    1,
+)]
+
+texinfo_documents=[(
+    'index', 
+    'cli3', 
+    'cli3 Documentation',
+    'Andrew Scott', 
+    'cli3', 
+    'One line description of project.',
+    'Miscellaneous',
+)]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
