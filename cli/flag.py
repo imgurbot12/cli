@@ -3,8 +3,8 @@ all possible flags allowed to be passed into application and parsed from args
 """
 from datetime import timedelta
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import List, Callable, Optional, Any, Union
+from dataclasses import dataclass
+from typing import List, Optional, Any, Union
 
 from .argument import *
 
@@ -42,7 +42,17 @@ def capture_errors():
 
 @dataclass
 class Flag:
-    """baseclass Flag declaration"""
+    """
+    baseclass Flag declaration
+    
+    :param name:      name of flag
+    :param usage:     usage description
+    :param default:   default value
+    :param hidden:    hide flag in help if true
+    :param required:  ensure flag has value before allowing action
+    :param type:      supported type for flag
+    :param has_value: internal tracker if flag does not have a value
+    """
 
     name:      str
     usage:     Optional[str] = None
@@ -110,7 +120,11 @@ class FloatFlag(Flag):
 
 @dataclass
 class DecimalFlag(Flag):
-    """implementation for supporting controlable decimal flags"""
+    """
+    implementation for supporting controlable decimal flags
+
+    :param decimal: number of allowed decimal places
+    """
     type:    Any = float
     decimal: int = 2
 
@@ -141,7 +155,11 @@ class DurationFlag(Flag):
 
 @dataclass
 class EnumFlag:
-    """implementation for supporting enum-value flags"""
+    """
+    implementation for supporting enum-value flags
+
+    :param enum: enumeration allowed of allowed values in flag
+    """
     enum: Union[set, dict]
     type: Any = str
 
@@ -154,11 +172,16 @@ class EnumFlag:
 
 @dataclass
 class FilePathFlag(Flag):
+    """
+    implementation for supporting existing/new file-paths
+
+    :param exists: ensure file exists if true
+    """
     type:   Any  = str
     exists: bool = True
 
     def convert(self, value: str) -> str:
         """ensure filepath exists or doesn't exist based on `exists` setting"""
-        if exists:
+        if self.exists:
             return parse_existing_file(value)
         return parse_new_file(value)

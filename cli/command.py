@@ -190,7 +190,22 @@ class CommandBase:
 
 @dataclass
 class Command(CommandBase):
-    """controls specifications and behavior of a cli command"""
+    """
+    controls specifications and behavior of a cli command
+    
+    :param name:         name of command
+    :param aliases:      name aliases for command
+    :param usage:        usage description 
+    :param argsusage:    argument usage description
+    :param category:     assigned command category
+    :param hidden:       hide command in help if true
+    :param flags:        configured command flags
+    :param commands:     configured subcommands of command
+    :param allow_parent: allow parent to run on child command run
+    :param before:       command before-action function
+    :param action:       command action function
+    :param after:        command after-action function
+    """
 
     name:         str
     aliases:      List[str]     = field(default_factory=list)

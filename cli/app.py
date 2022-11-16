@@ -35,7 +35,32 @@ NotFoundFunc = Callable[[Context, Command, str], None]
 
 @dataclass
 class App(CommandBase):
-    """application determines handling of arguments and stores metadata"""
+    """
+    application determines handling of arguments and stores metadata
+
+    :param name:              name of application
+    :param usage:             specified usage description
+    :param version:           symantic version number
+    :param argsusage:         argument usage description
+    :param description:       long general description
+    :param flags:             configured application flags
+    :param commands:          configured application subcommands
+    :param allow_parent:      allow parent command to run when children are
+    :param authors:           list of author names
+    :param email:             primary contact email
+    :param copyright:         copyright info summary
+    :param writer:            app standard output buffer
+    :param err_writer:        app error output buffer
+    :param help_app_template: jinja2 app help template
+    :param help_cmd_template: jinja2 cmd help template
+    :param before:            before-action function
+    :param action:            primary app action function
+    :param after:             after-action function
+    :param on_usage_error:    override usage-error function
+    :param exit_with_error:   override exit-with-error function
+    :param not_found_error:   override not-found-error function
+    :param run_async:         return co-routine on run if true
+    """
 
     name:         str
     usage:        str
@@ -122,13 +147,14 @@ class App(CommandBase):
         print(msg, file=ctx.app.err_writer)
         raise SystemExit(EX_UNAVAILABLE)
 
-    def run(self, args: List[str] = sys.argv) -> Optional[asyncio.Future]:
+    def run(self, args: Optional[List[str]] = None) -> Optional[asyncio.Future]:
         """
         run the relevant actions based on the arguments given and app defintions
 
         :param args: arguments being parsed and passed into relevant actions
         :return:     asyncio.Future if run_async=True
         """
+        args   = args if args is not None else sys.argv
         loop   = asyncio.get_event_loop_policy().get_event_loop()
         future = asyncio.ensure_future(run_app(self, args), loop=loop)
         if self.run_async:

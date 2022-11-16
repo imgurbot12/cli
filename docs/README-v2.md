@@ -1,15 +1,16 @@
 cli
 ---
 
-[![forthebadge](https://forthebadge.com/images/badges/you-didnt-ask-for-this.svg)](https://forthebadge.com)
-[![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
-[![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
-
 I was tired of looking for a cli library powerful enough for what I needed along with
 support for subcommands so instead I wrote my own taking inspiration from an 
 [existing library](https://github.com/urfave/cli) in golang.
 
 CLI is a simple, fast, and efficient library to control your command line application.
+
+**NOTE: v2 of the api does not exlcude the use of v1. It's simply a convenient wrapper
+around the same provided functionality. All objects act and operate the same way
+as in v1 but with the added bonus of being able to use decorators to parse and supply
+information conveniently and automatically.**
 
 <!-- toc -->
 
