@@ -238,4 +238,32 @@ def fail(ctx: cli.Context, *, fail: bool = False):
 fail.run()
 ```
 
+# Async
+
+CLI supports both async and non-async functions, even in combination.
+You can similarly choose to run the entire app asynchronously or synchronously
+independantly of the app's composition.
+
+```python
+import cli
+import asyncio
+
+@cli.app()
+async def hello(ctx: cli.Context, name: str = 'World'):
+  print(f'Hello {name}!', file=ctx.app.writer)
+
+# run sync command functions alongside async ones
+@hello.command
+def foo():
+  print('Foo!')
+
+async def main():
+  await hello.run(run_async=True)
+
+# call app asynchronously
+asyncio.run(main())
+
+# or call entire app synchronously
+hello.run(run_async=False)
+```
 

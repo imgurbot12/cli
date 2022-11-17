@@ -285,7 +285,8 @@ def app(
     email:        Optional[str]  = None,
     authors:      Optional[list] = None,
     copyright:    Optional[str]  = None,
-    allow_parent: bool           = False
+    allow_parent: bool           = False,
+    **kwargs:     Any,
 ) -> App:
     """
     dynamically generate a simple cli-application from the decorated function
@@ -299,6 +300,7 @@ def app(
     :param authors:      list of authors associated w/ application
     :param copyright:    copyright linked with application
     :param allow_parent: allow base parent app to run when child command is run
+    :param kwargs:       additonal keyword arguments to pass to app definiton
     :return:             decorator that returns generated application object
     """
     def decorator(func: Callable) -> App:
@@ -316,5 +318,6 @@ def app(
             allow_parent=allow_parent,
             action=main,
             flags=main.flags,
+            **kwargs,
         )
     return decorator

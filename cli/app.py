@@ -31,6 +31,17 @@ ExitErrorFunc  = Callable[[Context, Command, str, int], None]
 #: defintion for command-not-found function
 NotFoundFunc = Callable[[Context, Command, str], None]
 
+#** Functions **#
+
+def get_event_loop() -> asyncio.BaseEventLoop:
+    """retrieve asyncio event loop"""
+    try:
+        loop = asyncio.get_running_loop()
+    except:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
 #** Classes **#
 
 @dataclass
@@ -147,16 +158,21 @@ class App(CommandBase):
         print(msg, file=ctx.app.err_writer)
         raise SystemExit(EX_UNAVAILABLE)
 
-    def run(self, args: Optional[List[str]] = None) -> Optional[asyncio.Future]:
+    def run(self, 
+        args:      Optional[List[str]] = None,
+        run_async: Optional[bool]      = None,
+    ) -> Optional[asyncio.Future]:
         """
         run the relevant actions based on the arguments given and app defintions
 
-        :param args: arguments being parsed and passed into relevant actions
-        :return:     asyncio.Future if run_async=True
+        :param args:      args being parsed and passed into relevant actions
+        :param run_async: override app run_async setting
+        :return:          asyncio.Future if run_async=True
         """
-        args   = args if args is not None else sys.argv
-        loop   = asyncio.get_event_loop_policy().get_event_loop()
+        args   = args if args is not None else sys.argv.copy()
+        loop   = get_event_loop()
         future = asyncio.ensure_future(run_app(self, args), loop=loop)
-        if self.run_async:
+        rasync = run_async if run_async is not None else self.run_async
+        if rasync:
             return future
         loop.run_until_complete(future)
