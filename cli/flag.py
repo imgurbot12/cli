@@ -131,7 +131,7 @@ class DecimalFlag(Flag):
     def convert(self, value: str) -> Optional[float]:
         """handle float founding based on decimal setting"""
         with capture_errors():
-            return parse_duration(value)
+            return parse_decimal(value)
 
 @dataclass
 class ListFlag(Flag):

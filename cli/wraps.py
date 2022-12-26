@@ -34,7 +34,13 @@ ExistingFile = TypeVar('ExistingFile')
 
 #** Functions **#
 
-def inspectfunc(func: Callable) -> Tuple[list, dict, dict]:
+def is_union(origin: type) -> bool:
+    """
+    python3 compatable way of searching for union types
+    """
+    return 'Union' in str(origin) or 'Union' in type(origin).__name__
+
+def inspectfunc(func: Callable) -> Tuple[list, dict, dict, dict]:
     """
     parse and retrieve list of argument names alongside argument typehints
 
@@ -84,6 +90,9 @@ def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
     if origin in (set, list, tuple):
         func = compile_typehint(attr, args[0], depth+1)
         return parse_list_function(func, origin)
+    # support `Optional[<hint>]` or `<hint> | None` types
+    if is_union(origin) and len(args) == 2 and args[1] is type(None):
+        return compile_typehint(attr, args[0], depth=depth+1)
     raise ValueError(f'{attr!r} uses an unsupported typehint: {hint}')
 
 def compile_command_arg_validator(
@@ -129,9 +138,18 @@ def compile_command_flags(
     names:    List[str],
     hints:    List[Any],
     funcs:    List[TypeFunc],
-    defaults: Dict[str, Any]
+    defaults: Dict[str, Any],
+    is_app:   bool = False
 ) -> List[Flag]:
     """
+    compile command flags based on given configuration
+
+    :param names:    list of parameter names
+    :param hints:    list of typehints for parameters
+    :param funcs:    parse functions to use in flag object
+    :param defaults: default values for associated parameter names
+    :param is_app:   boolean flag to tweak short name generation
+    :return:         list of generated flag objects
     """
     # parse function doc to search for flag descriptions
     descriptions, doc = {}, func.__doc__ or ''
@@ -149,7 +167,8 @@ def compile_command_flags(
         # assign param/usage to description table
         descriptions[param.strip(strip)] = usage.strip(strip)
     # generate flags
-    flags, shorts = [], []
+    flags  = []
+    shorts = [] if not is_app else ['h']
     for name, hint, func in zip(names, hints, funcs):
         # set shortform if first letter is unique
         fname = name.strip('_')
@@ -198,15 +217,16 @@ def compile_command_argsusage(action: Action) -> str:
     usage.append('[flags...]')
     return ' '.join(usage)
 
-def action(func: Callable) -> Action:
+def action(func: Callable, is_app: bool = False) -> Action:
     """
     wrap python function as standard command action
 
-    :param func: function being wrapped and converted into command action
-    :return:     generated function command action
+    :param func:   function being wrapped and converted into command action
+    :param is_app: tweak command and flag generation when building app action
+    :return:       generated function command action
     """
-    func                              = wrap_async(func)
-    args, kwargs, defaults, typehints = inspectfunc(func)
+    func = wrap_async(func)
+    args, kwargs, dfaults, typehints = inspectfunc(func)
     # generate argument type converters/validators
     argtypes      = [typehints[name] for name in args]
     arglist       = [compile_typehint(name, typehints[name]) for name in args]
@@ -214,12 +234,12 @@ def action(func: Callable) -> Action:
     # fill out any flag fields w/ their associated data
     ftypes = [typehints[name] for name in kwargs]
     flist  = [compile_typehint(name, typehints[name]) for name in kwargs]
-    flags  = compile_command_flags(func, kwargs, ftypes, flist, defaults)
+    flags  = compile_command_flags(func, kwargs, ftypes, flist, dfaults, is_app)
     # generate argument number validator
     max_args        = sum(1 for func in arglist if func is not None)
     arg_diff        = len(arglist) - max_args
     max_args        = len([f for f in arglist if f])
-    min_args        = sum(1 for a in args if a not in defaults) - arg_diff
+    min_args        = sum(1 for a in args if a not in dfaults) - arg_diff
     validate_argnum = range_args(min_args, max_args)
     # complete action translation
     @functools.wraps(func)
@@ -231,7 +251,7 @@ def action(func: Callable) -> Action:
         return await func(*args, **kwargs)
     # export a few variables for command generation
     action.flags     = flags.copy()
-    action.defaults  = defaults
+    action.defaults  = dfaults
     action.arguments = [arg for n, arg in enumerate(args, 0) if arglist[n]]
     # return generated action function
     return action
@@ -305,7 +325,7 @@ def app(
     """
     def decorator(func: Callable) -> App:
         cname = name or func.__name__.strip('_')
-        main  = action(func)
+        main  = action(func, is_app=True)
         return App(
             name=cname,
             usage=usage or compile_command_usage(main),
