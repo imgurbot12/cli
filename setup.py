@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='cli3',
-    version='1.0.1',
+    version='1.0.2',
     license='MIT',
     packages=find_packages(),
     url='https://github.com/imgurbot12/cli',
