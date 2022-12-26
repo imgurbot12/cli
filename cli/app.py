@@ -5,7 +5,7 @@ import sys
 import asyncio
 from io import RawIOBase
 from dataclasses import dataclass, field, InitVar
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Coroutine
 
 from .flag import Flags
 from .context import Context
@@ -161,18 +161,23 @@ class App(CommandBase):
     def run(self, 
         args:      Optional[List[str]] = None,
         run_async: Optional[bool]      = None,
-    ) -> Optional[asyncio.Future]:
+    ) -> Optional[Coroutine[None, None, None]]:
         """
         run the relevant actions based on the arguments given and app defintions
 
         :param args:      args being parsed and passed into relevant actions
         :param run_async: override app run_async setting
-        :return:          asyncio.Future if run_async=True
+        :return:          asyncio coroutine if run_async=True
         """
         args   = args if args is not None else sys.argv.copy()
-        loop   = get_event_loop()
-        future = asyncio.ensure_future(run_app(self, args), loop=loop)
+        future = run_app(self, args)
         rasync = run_async if run_async is not None else self.run_async
         if rasync:
             return future
-        loop.run_until_complete(future)
+        # generate new loop and ensure closure reguardless of error
+        try:
+            loop = get_event_loop()
+            loop.run_until_complete(future)
+        finally:
+            loop.close()
+

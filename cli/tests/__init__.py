@@ -43,13 +43,13 @@ class BaseTests:
         finally:
             content = read_buffer(buffer)
             self.assertIn(expect, content, msg='unexpected app response')
-    
+   
     def test_help(self):
         """
         validate and test help utility
         """
         self.t(['help', 'do', 'ayylmao'], SystemExit, 'No Help topic for: app->do->ayylmao')
-    
+   
     def test_flags(self):
         """
         validate and test flag parsing
