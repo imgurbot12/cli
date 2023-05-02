@@ -5,9 +5,9 @@ from typing import Any, List, Optional
 
 from jinja2 import Environment
 
+from .abc import Context, AbsCommand
 from .flag import BoolFlag
-from .context import Context
-from .command import CommandBase, Command
+from .command import Command
 
 #** Variables **#
 __all__ = [
@@ -62,7 +62,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
+    {{ cmd.display|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -73,7 +73,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
+    {{ flag.display|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 
@@ -107,7 +107,7 @@ COMMANDS:
         {%- for cmd in visible_commands %}
             {%- if cmd.category == category %}
     {% if active_category %}    {% endif -%}
-    {{ cmd.to_string()|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
+    {{ cmd.display|buffer(cbuffer) }} - {{ cmd.usage or default_usage }}
             {%- endif %}
         {%- endfor %}
     {%- endfor %}
@@ -118,7 +118,7 @@ COMMANDS:
 GLOBAL OPTIONS:
 {%- set fbuffer = calc_buffer(visible_flags) %}
 {%- for flag in visible_flags %}
-    {{ flag.to_string()|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
+    {{ flag.display|buffer(fbuffer) }} - {{ flag.usage or default_usage }}
 {%- endfor %}
 {%- endif %}
 """
@@ -136,9 +136,9 @@ def jinja_calc_buffer(fields: List[Any], category: Optional[str] = None) -> int:
     """calculate buffer for list of fields based on their length"""
     if category:
         fields = [f for f in fields if f.category == category]
-    return max(len(f.to_string()) for f in fields)
+    return max(len(f.display) for f in fields)
 
-def get_vars(cmd: CommandBase) -> dict:
+def get_vars(cmd: AbsCommand) -> dict:
     """collect variables to use for template generation"""
     kwargs = vars(cmd).copy()
     kwargs.update({
@@ -148,7 +148,7 @@ def get_vars(cmd: CommandBase) -> dict:
     })
     return kwargs
 
-def help_action(ctx: Context, command: Optional[Command] = None):
+def help_action(ctx: Context, command: Optional[AbsCommand] = None):
     """action used to render help content"""
     # recurse arguments to find sub-command
     cmd = command or ctx.app

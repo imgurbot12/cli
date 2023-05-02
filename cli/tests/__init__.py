@@ -5,6 +5,9 @@ from typing import *
 from .. import App
 from .app import v1, v2
 
+#** Variables **#
+__all__ = ['TestAppV1', 'TestAppV2']
+
 #** Functions **#
 
 def read_buffer(buf: io.StringIO) -> str:
@@ -21,8 +24,8 @@ class BaseTests:
     
     def t(self, 
         args:   List[str], 
-        raises: Optional[Exception] = None,
-        expect: Optional[str]       = None,
+        raises: Optional[Type[BaseException]] = None,
+        expect: Optional[str]                 = None,
     ):
         """
         run the app with the given arguments/flags and check for response
@@ -43,7 +46,7 @@ class BaseTests:
         finally:
             content = read_buffer(buffer)
             self.assertIn(expect, content, msg='unexpected app response')
-   
+ 
     def test_help(self):
         """
         validate and test help utility
@@ -56,13 +59,13 @@ class BaseTests:
         """
         name = self.app.name
         with self.subTest('not defined'):
-            self.t(['echo', '-a'], SystemExit, 'Command: echo, Invalid Flag: -a')
-            self.t(['-a'], SystemExit, f'Command: {name}, Invalid Flag: -a')
-            self.t(['do', 'run', '-a'], SystemExit, 'Command: run, Invalid Flag: -a')
+            self.t(['echo', '-a'], SystemExit, "Command: 'echo', Invalid Flag: -a")
+            self.t(['-a'], SystemExit, f'Command: {name!r}, Invalid Flag: -a')
+            self.t(['do', 'run', '-a'], SystemExit, "Command: 'run', Invalid Flag: -a")
         with self.subTest('invalid location'):
-            self.t(['-f', 'echo'], SystemExit, f'Command: {name}, Invalid Flag: -f')
+            self.t(['-f', 'echo'], SystemExit, f'Command: {name!r}, Invalid Flag: -f')
         with self.subTest('double usage'):
-            msg =  'Incorrect Usage: flag: debug, d declared more than once'
+            msg =  "Incorrect Usage: flag 'debug, d' declared more than once"
             self.t(['-d', '--debug', 'echo'], SystemExit, msg)
             self.t(['-d', '-d', 'echo'], SystemExit, msg)
     

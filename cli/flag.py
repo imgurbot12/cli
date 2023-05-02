@@ -1,17 +1,16 @@
 """
 all possible flags allowed to be passed into application and parsed from args
 """
-from datetime import timedelta
 from contextlib import contextmanager
-from dataclasses import dataclass
-from typing import List, Optional, Any, Union
+from datetime import timedelta
+from dataclasses import dataclass, field
+from typing import TypeVar, Optional, Any, Union, Type, List, ClassVar
 
+from .abc import *
 from .argument import *
 
 #** Variables **#
 __all__ = [
-    'Flags',
-
     'Flag',
 
     'BoolFlag',
@@ -25,8 +24,8 @@ __all__ = [
     'FilePathFlag',
 ]
 
-#: defintion for list of flags
-Flags = List['Flag']
+#: typehint for generic typevar
+T = TypeVar('T')
 
 #** Functions **#
 
@@ -40,8 +39,10 @@ def capture_errors():
 
 #** Classes **#
 
+#TODO: move flag validation to app setup and execution
+
 @dataclass
-class Flag:
+class Flag(AbsFlag[T]):
     """
     baseclass Flag declaration
     
@@ -53,117 +54,87 @@ class Flag:
     :param type:      supported type for flag
     :param has_value: internal tracker if flag does not have a value
     """
-
     name:      str
-    usage:     Optional[str] = None
-    default:   Any           = None
-    hidden:    bool          = False
-    required:  bool          = False
-    type:      Any           = str
-    has_value: bool          = True
+    type:      Type[T]
+    usage:     Optional[str] = field(default=None,  kw_only=True)
+    default:   Any           = field(default=None,  kw_only=True)
+    hidden:    bool          = field(default=False, kw_only=True)
+    required:  bool          = field(default=False, kw_only=True)
+    has_value: bool          = field(default=True,  kw_only=True)
 
-    def __post_init__(self):
-        """ensure all flag settings are validated or raise error"""
-        if self.default is not None and isinstance(self.type, type):
-            if not isinstance(self.default, self.type):
-                raise ValueError('default=%r not type=%s' % (
-                    self.default, self.type.__name__))
-
-    def to_string(self) -> str:
-        """convert flag names to string for help formatting"""
-        return self.name
-
-    @property
-    def names(self) -> List[str]:
-        """retrieve list of possible flag names"""
-        return self.name.split(', ', 1)
-
-    def index(self, values: List[str]) -> int:
-        """
-        return index of flag in values if found
-
-        :param values: list of values to search
-        :return:       index-num (if found); -1 (if missing)
-        """
-        names = self.names
-        for n, value in enumerate(values, 0):
-            if value.lstrip('-') in names and value.startswith('-'):
-                return n
-        return -1
-
-    def convert(self, value: str) -> Any:
+    def parse(self, value: str) -> T:
         """convert cli-value into the correct-type"""
         with capture_errors():
             return self.type(value)
 
 @dataclass
-class BoolFlag(Flag):
+class BoolFlag(Flag[bool]):
     """implementation for supporting boolean flags"""
-    type:      Any  = bool
-    default:   Any  = False
-    has_value: bool = False
+    type:      ClassVar[Type] = bool
+    default:   bool           = False
+    has_value: bool           = False
 
 @dataclass
-class IntFlag(Flag):
+class IntFlag(Flag[int]):
     """implementation for supporting integer flags"""
-    type: Any = int
+    type: ClassVar = int
 
 @dataclass
-class StringFlag(Flag):
+class StringFlag(Flag[str]):
     """implementation for supporting string flags"""
-    type: Any = str
+    type: ClassVar[Type] = str
 
 @dataclass
-class FloatFlag(Flag):
+class FloatFlag(Flag[float]):
     """implementation for supporting flag flags"""
-    type: Any = float
+    type: ClassVar[Type] = float
 
 @dataclass
-class DecimalFlag(Flag):
+class DecimalFlag(Flag[float]):
     """
     implementation for supporting controlable decimal flags
 
     :param decimal: number of allowed decimal places
     """
-    type:    Any = float
-    decimal: int = 2
+    type:    ClassVar[Type] = float
+    decimal: int            = 2
 
-    def convert(self, value: str) -> Optional[float]:
+    def parse(self, value: str):
         """handle float founding based on decimal setting"""
         with capture_errors():
-            return parse_decimal(value)
+            return parse_decimal(value, self.decimal)
 
 @dataclass
-class ListFlag(Flag):
+class ListFlag(Flag[List[str]]):
     """implementatin for supporting list flags"""
-    type: Any = list
+    type: ClassVar[Type] = list
 
-    def convert(self, value: str) -> Optional[list]:
+    def parse(self, value: str):
         """convert value into list object"""
         with capture_errors():
             return [c.strip() for c in value.split(',')]
 
 @dataclass
-class DurationFlag(Flag):
+class DurationFlag(Flag[timedelta]):
     """implementation for supporting time-duration flags"""
-    type: Any = timedelta
+    type: ClassVar[Type] = timedelta
 
-    def convert(self, value: str) -> Optional[timedelta]:
+    def parse(self, value: str):
         """convert string-value into timedelta"""
         with capture_errors():
             return parse_duration(value)
 
 @dataclass
-class EnumFlag:
+class EnumFlag(Flag[Any]):
     """
     implementation for supporting enum-value flags
 
     :param enum: enumeration allowed of allowed values in flag
     """
+    type: ClassVar[Type] = Any
     enum: Union[set, dict]
-    type: Any = str
-
-    def convert(self, value: str) -> Optional[str]:
+    
+    def parse(self, value: str) -> Optional[Any]:
         """ensure the specified value is included in the enum"""
         with capture_errors():
             if value not in self.enum:
@@ -171,16 +142,16 @@ class EnumFlag:
             return self.enum[value] if isinstance(self.enum, dict) else value
 
 @dataclass
-class FilePathFlag(Flag):
+class FilePathFlag(Flag[str]):
     """
     implementation for supporting existing/new file-paths
 
     :param exists: ensure file exists if true
     """
-    type:   Any  = str
-    exists: bool = True
+    type:   ClassVar[Type] = str
+    exists: bool           = True
 
-    def convert(self, value: str) -> str:
+    def parse(self, value: str) -> str:
         """ensure filepath exists or doesn't exist based on `exists` setting"""
         if self.exists:
             return parse_existing_file(value)

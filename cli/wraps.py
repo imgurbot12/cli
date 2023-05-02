@@ -6,9 +6,9 @@ import functools
 from typing import *
 from datetime import timedelta
 
+from .abc import *
 from .app import App
 from .flag import Flag
-from .context import Context
 from .command import Action, Command, wrap_async
 from .argument import *
 
@@ -24,13 +24,25 @@ __all__ = [
     'command',
 ]
 
-null = type(None)
+#: typehint for none-type
+Null = type(None)
 
 # custom typevars for associated translation functions
-Decimal      = TypeVar('Decimal')
-Duration     = TypeVar('Duration')
-NewFile      = TypeVar('NewFile')
-ExistingFile = TypeVar('ExistingFile')
+Decimal      = NewType('Decimal', float)
+Duration     = NewType('Duration', str)
+NewFile      = NewType('NewFile', str)
+ExistingFile = NewType('ExistingFile', str)
+
+class Inspected(NamedTuple):
+    args:      List[str]
+    kwargs:    List[str]
+    defaults:  Dict[str, Any]
+    typehints: Dict[str, Type]
+
+class ActionCtx(NamedTuple):
+    flags:     Flags
+    defaults:  Dict[str, Any]
+    arguments: List[str]
 
 #** Functions **#
 
@@ -40,7 +52,7 @@ def is_union(origin: type) -> bool:
     """
     return 'Union' in str(origin) or 'Union' in type(origin).__name__
 
-def inspectfunc(func: Callable) -> Tuple[list, dict, dict, dict]:
+def inspectfunc(func: Callable) -> Inspected:
     """
     parse and retrieve list of argument names alongside argument typehints
 
@@ -56,9 +68,9 @@ def inspectfunc(func: Callable) -> Tuple[list, dict, dict, dict]:
     # determine typehint of arg based on default if not already specified
     for name in (name for name in args if name not in typehints):
         typehints[name] = type(defaults.get(name, ''))
-    return args, kwargs, defaults, typehints
+    return Inspected(args, kwargs, defaults, typehints)
 
-def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
+def compile_typehint(attr: str, hint: Any, depth: int = 0) -> Optional[TypeFunc]:
     """
     compile the given attribute's typehint into a string-to-type function
 
@@ -89,17 +101,19 @@ def compile_typehint(attr: str, hint: Any, depth: int = 0) -> TypeFunc:
     origin, args = get_origin(hint), get_args(hint)
     if origin in (set, list, tuple):
         func = compile_typehint(attr, args[0], depth+1)
+        if func is None:
+            raise ValueError(f'{attr!r} uses invalid typehint: {args[0]!r}')
         return parse_list_function(func, origin)
     # support `Optional[<hint>]` or `<hint> | None` types
-    if is_union(origin) and len(args) == 2 and args[1] is type(None):
+    if is_union(origin) and len(args) == 2 and args[1] is Null:
         return compile_typehint(attr, args[0], depth=depth+1)
     raise ValueError(f'{attr!r} uses an unsupported typehint: {hint}')
 
 def compile_command_arg_validator(
     names: List[str],
     hints: List[Any],
-    funcs: List[TypeFunc]
-) -> Action:
+    funcs: List[Optional[TypeFunc]]
+) -> Callable[[Context], List[Any]]:
     """
     convert values according to their typefunctions
 
@@ -112,8 +126,10 @@ def compile_command_arg_validator(
         values, tracked = [], 0
         for (name, hint, func) in zip(names, hints, funcs):
             # pass context in if hint is for context
-            if hint == Context:
-                values.append(ctx)
+            print('validate', name, hint, func)
+            if func is None:
+                if hint == Context:
+                    values.append(ctx)
                 continue
             # retrieve value from args if exists
             val = ctx.args.get(tracked)
@@ -137,10 +153,10 @@ def compile_command_flags(
     func:     Callable,
     names:    List[str],
     hints:    List[Any],
-    funcs:    List[TypeFunc],
+    funcs:    List[Optional[TypeFunc]],
     defaults: Dict[str, Any],
     is_app:   bool = False
-) -> List[Flag]:
+) -> Flags:
     """
     compile command flags based on given configuration
 
@@ -170,6 +186,8 @@ def compile_command_flags(
     flags  = []
     shorts = [] if not is_app else ['h']
     for name, hint, func in zip(names, hints, funcs):
+        if func is None:
+            continue
         # set shortform if first letter is unique
         fname = name.strip('_')
         short = fname.lower()[0]
@@ -201,7 +219,7 @@ def compile_command_usage(action: Action) -> str:
         usage += line + ' '
     return usage.strip()
 
-def compile_command_argsusage(action: Action) -> str:
+def compile_command_argsusage(action_ctx: ActionCtx) -> str:
     """
     compile command argsusage from action argument information
 
@@ -209,15 +227,15 @@ def compile_command_argsusage(action: Action) -> str:
     :return:              generated command argsusage
     """
     usage = []
-    for arg in action.arguments:
-        if arg in action.defaults:
+    for arg in action_ctx.arguments:
+        if arg in action_ctx.defaults:
             usage.append('[arguments...]')
             break
         usage.append(f'[{arg}]')
     usage.append('[flags...]')
     return ' '.join(usage)
 
-def action(func: Callable, is_app: bool = False) -> Action:
+def action(func: Callable, is_app: bool = False) -> Tuple[AsyncAction, ActionCtx]:
     """
     wrap python function as standard command action
 
@@ -226,38 +244,35 @@ def action(func: Callable, is_app: bool = False) -> Action:
     :return:       generated function command action
     """
     func = wrap_async(func)
-    args, kwargs, dfaults, typehints = inspectfunc(func)
+    spec = inspectfunc(func)
     # generate argument type converters/validators
-    argtypes      = [typehints[name] for name in args]
-    arglist       = [compile_typehint(name, typehints[name]) for name in args]
-    validate_args = compile_command_arg_validator(args, argtypes, arglist)
+    arghints      = [spec.typehints[name] for name in spec.args]
+    arglist       = [compile_typehint(*args) for args in zip(spec.args, arghints)]
+    validate_args = compile_command_arg_validator(spec.args, arghints, arglist)
     # fill out any flag fields w/ their associated data
-    ftypes = [typehints[name] for name in kwargs]
-    flist  = [compile_typehint(name, typehints[name]) for name in kwargs]
-    flags  = compile_command_flags(func, kwargs, ftypes, flist, dfaults, is_app)
+    fhints = [spec.typehints[name] for name in spec.kwargs] 
+    flist  = [compile_typehint(*args) for args in zip(spec.kwargs, fhints)]
+    flags  = compile_command_flags(func, spec.kwargs, fhints, flist, spec.defaults, is_app)
     # generate argument number validator
     max_args        = sum(1 for func in arglist if func is not None)
     arg_diff        = len(arglist) - max_args
     max_args        = len([f for f in arglist if f])
-    min_args        = sum(1 for a in args if a not in dfaults) - arg_diff
+    min_args        = sum(1 for a in spec.args if a not in spec.defaults) - arg_diff
     validate_argnum = range_args(min_args, max_args)
     # complete action translation
     @functools.wraps(func)
     async def action(ctx: Context):
         validate_argnum(ctx)
         args   = validate_args(ctx)
-        names  = [flag.names[0] for flag in flags]
+        names  = [flag.long for flag in flags]
         kwargs = {name:ctx.get(name) for name in names}
         return await func(*args, **kwargs)
-    # export a few variables for command generation
-    action.flags     = flags.copy()
-    action.defaults  = dfaults
-    action.arguments = [arg for n, arg in enumerate(args, 0) if arglist[n]]
     # return generated action function
-    return action
+    arguments = [arg for arg, hint in zip(spec.args, arglist) if hint]
+    return action, ActionCtx(flags.copy(), spec.defaults, arguments)
 
 def command(
-    parent:       Command,
+    parent:       AbsCommand,
     name:         Optional[str]  = None,
     aliases:      Optional[list] = None,
     usage:        Optional[str]  = None,
@@ -265,7 +280,7 @@ def command(
     category:     str            = '*',
     hidden:       Optional[bool] = None,
     allow_parent: bool           = False
-):
+) -> CommandFunc:
     """
     dynamically generate a cli-command from the decorated function
 
@@ -279,18 +294,18 @@ def command(
     :return:             decorator that returns generated command object
     """
     def decorator(func: Callable) -> Command:
-        fname   = func.__name__
-        main    = action(func)
+        fname     = func.__name__
+        main, ctx = action(func)
         command = Command(
             name=name or fname.strip('_'),
             aliases=aliases or [],
             category=category,
             usage=usage or compile_command_usage(main),
-            argsusage=argsusage or compile_command_argsusage(main),
+            argsusage=argsusage or compile_command_argsusage(ctx),
             hidden=fname.startswith('_') if hidden is None else hidden,
             allow_parent=allow_parent,
             action=main,
-            flags=main.flags,
+            flags=ctx.flags,
         )
         parent.commands.append(command)
         return command
@@ -307,7 +322,7 @@ def app(
     copyright:    Optional[str]  = None,
     allow_parent: bool           = False,
     **kwargs:     Any,
-) -> App:
+) -> AppFunc:
     """
     dynamically generate a simple cli-application from the decorated function
 
@@ -324,20 +339,20 @@ def app(
     :return:             decorator that returns generated application object
     """
     def decorator(func: Callable) -> App:
-        cname = name or func.__name__.strip('_')
-        main  = action(func, is_app=True)
+        cname     = name or func.__name__.strip('_')
+        main, ctx = action(func, is_app=True)
         return App(
             name=cname,
             usage=usage or compile_command_usage(main),
             version=version or '0.0.1',
-            argsusage=argsusage or compile_command_argsusage(main),
+            argsusage=argsusage or compile_command_argsusage(ctx),
             description=description,
             authors=authors or [],
             email=email,
             copyright=copyright,
             allow_parent=allow_parent,
             action=main,
-            flags=main.flags,
+            flags=ctx.flags,
             **kwargs,
         )
     return decorator
