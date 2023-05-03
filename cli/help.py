@@ -153,16 +153,16 @@ def help_action(ctx: Context, command: Optional[AbsCommand] = None):
     # recurse arguments to find sub-command
     cmd = command or ctx.app
     if ctx.args.present():
-        path = 'app'
+        path = [ctx.app.name]
         for arg in ctx.args:
             for c in cmd.commands:
                 if c.has_name(arg):
-                    path += '->' + c.name
+                    path.append(c.name)
                     cmd   = c
                     break
             else:
                 if command is None:
-                    ctx.app.not_found_error(ctx, cmd, path+'->'+arg)
+                    ctx.not_found_error('invalid command', path)
     # set template based on given command
     template = ctx.app.help_app_template or help_app_template
     if cmd != ctx.app:

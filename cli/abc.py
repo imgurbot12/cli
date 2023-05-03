@@ -10,6 +10,7 @@ from typing_extensions import Self
 
 #** Variables **#
 __all__ = [
+    'T',
     'NO_ACTION',
     'Result',
     'SyncAction',
@@ -21,6 +22,8 @@ __all__ = [
     'Commands',
     'AppFunc',
     'CommandFunc',
+    'OptCoroutine',
+    'OptStrList',
 
     'CliError',
     'UsageError',
@@ -39,7 +42,8 @@ __all__ = [
 T = TypeVar('T')
 
 #: tracker for parser to know if a command has taken no action
-NO_ACTION = type('NO_ACTION', (), {})
+class NO_ACTION:
+    pass
 
 #: typehint definition for action return-type
 Result = Optional[Type[NO_ACTION]]
@@ -71,8 +75,11 @@ AppFunc = Callable[[Callable], 'AbsApplication']
 #: type definition command function
 CommandFunc = Callable[[Callable], 'AbsCommand']
 
-#: type definition for optional blank co-routine
-OptCoroutine = Coroutine[None, None, None]
+#: type definition for optional empty coroutine
+OptCoroutine = Optional[Coroutine[None, None, None]]
+
+#: type definition for optional list of strings
+OptStrList = Optional[List[str]]
 
 #** Functions **#
 
@@ -105,7 +112,14 @@ def ctx_default(flags: Flags, fdict: FlagDict, key: str, default: Any) -> Any:
 
 class CliError(Exception):
     """baseclass for all cli internal exceptions"""
-    pass
+
+    def __init__(self, msg: str, ctx: 'Context', cmd: 'AbsCommand'):
+        self.message = msg
+        self.context = ctx
+        self.command = cmd
+
+    def __str__(self):
+        return f'cmd={self.command.name!r} error={self.message!r}'
 
 class UsageError(CliError):
     """raise error during usage issue"""
@@ -113,11 +127,34 @@ class UsageError(CliError):
 class ExitError(CliError):
     """raise error when app must exit"""
 
+    def __init__(self, msg: str, code: int, ctx: 'Context', cmd: 'AbsCommand'):
+        self.message = msg
+        self.code    = code
+        self.context = ctx
+        self.command = cmd
+
 class NotFoundError(CliError):
     """raise error when app gets flag it doesnt recognize"""
 
+    def __init__(self, msg: str, path: List[str], ctx: 'Context', cmd: 'AbsCommand'):
+        self.message = msg
+        self.path    = path
+        self.context = ctx
+        self.command = cmd
+        if not path:
+            path.append(cmd.name)
+            while ctx.ctx_parent:
+                if ctx.command.name not in path:
+                    path.insert(0, ctx.command.name)
+                ctx = ctx.ctx_parent
+
 class ConfigError(CliError):
     """raise error when app is improperly configured"""
+
+    def __init__(self, msg: str, cmd: 'AbsCommand'):
+        self.message = msg
+        self.command = cmd
+        self.context = None
 
 class Args(UserList):
     """extended list object intended to add ease-of-use functions for context"""
@@ -154,10 +191,18 @@ class Context:
     """Context-Object to Pass Information into/from Various Command Actions"""
     app:          'AbsApplication'    = field(repr=False)
     command:      'AbsCommand'        = field(repr=False) 
-    parent:       Optional['Context'] = field(default=None, repr=False)
+    ctx_parent:   Optional['Context'] = field(default=None, repr=False)
     global_flags: FlagDict            = field(default_factory=dict)
     local_flags:  FlagDict            = field(default_factory=dict)
     args:         Args                = field(default_factory=Args)
+ 
+    @property
+    def parent(self) -> Self:
+        """retrieve parent or raise execution error"""
+        if self.ctx_parent is None:
+            raise CliError(
+                'Unable to retrieve Context Parent', self, self.command)
+        return self.ctx_parent
 
     def get(self, name: str, default: Any = None) -> Any:
         """
@@ -210,6 +255,14 @@ class Context:
         flags = self.app.flags if isglobal else self.command.flags
         fdict = self.global_flags if isglobal else self.local_flags
         return ctx_default(flags, fdict, name, value)
+ 
+    def not_found_error(self, error: str, path: List[str]):
+        """
+        handle not-found error with the current action
+
+        :param error: error-message to pass to handlers
+        """
+        raise NotFoundError(error, path, self, self.command)
 
     def on_usage_error(self, error: str):
         """
@@ -217,7 +270,7 @@ class Context:
 
         :param error: error-message to pass to handlers
         """
-        raise UsageError(error)
+        raise UsageError(error, self, self.command)
 
     def exit_with_error(self, error: str, exit_code: int = 1):
         """
@@ -226,7 +279,7 @@ class Context:
         :param error:     error-message to pass to handlers
         :param exit_code: exit-code to exit program with
         """
-        raise ExitError(error, exit_code)
+        raise ExitError(error, exit_code, self, self.command)
 
 class AbsFlag(Protocol[T]):
     """Abstract Flag Object Definition"""
@@ -279,6 +332,20 @@ class AbsCommand(Protocol):
     category:     Optional[str]
     hidden:       bool
     allow_parent: bool
+    
+    @overload
+    @abstractmethod
+    def command(self, func: Callable) -> 'AbsCommand':
+        ...
+    
+    @overload
+    @abstractmethod
+    def command(self, *args, **kwargs) -> CommandFunc:
+        ...
+
+    @abstractmethod
+    def command(self, *args, **kwargs) -> Union['AbsCommand', CommandFunc]:
+        raise NotImplementedError
 
     async def run_before(self, ctx: Context):
         pass
@@ -361,17 +428,31 @@ class AbsApplication(AbsCommand, Protocol):
     help_cmd_template: Optional[str]
     
     @abstractmethod
-    def on_usage_error(self, ctx: Context, cmd: AbsCommand, error: str):
+    def on_usage_error(self, err: UsageError):
         raise NotImplementedError
 
     @abstractmethod
-    def exit_with_error(self, ctx: Context, cmd: AbsCommand, err: str, code: int):
+    def exit_with_error(self, err: ExitError):
         raise NotImplementedError
 
     @abstractmethod
-    def not_found_error(self, ctx: Context, cmd: AbsCommand, arg: str):
+    def not_found_error(self, err: NotFoundError):
         raise NotImplementedError
 
     @abstractmethod
-    def run(self, args: Optional[List[str]] = None, run_async: Optional[bool] = None) -> OptCoroutine:
+    def config_error(self, err: ConfigError):
+        raise NotImplementedError
+ 
+    @overload
+    @abstractmethod
+    def run(self, args: OptStrList = None, run_async: Literal[False] = False):
+        ...
+
+    @overload
+    @abstractmethod
+    def run(self, args: OptStrList = None, run_async: Literal[True] = True) -> Coroutine[None, None, None]:
+        ...
+
+    @abstractmethod
+    def run(self, args: OptStrList = None, run_async: bool = False) -> OptCoroutine:
         raise NotImplementedError

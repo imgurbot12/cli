@@ -126,7 +126,6 @@ def compile_command_arg_validator(
         values, tracked = [], 0
         for (name, hint, func) in zip(names, hints, funcs):
             # pass context in if hint is for context
-            print('validate', name, hint, func)
             if func is None:
                 if hint == Context:
                     values.append(ctx)
@@ -185,7 +184,7 @@ def compile_command_flags(
     # generate flags
     flags  = []
     shorts = [] if not is_app else ['h']
-    for name, hint, func in zip(names, hints, funcs):
+    for name, hint, parser in zip(names, hints, funcs):
         if func is None:
             continue
         # set shortform if first letter is unique
@@ -200,8 +199,9 @@ def compile_command_flags(
             usage=descriptions.get(name),
             default=defaults.get(name),
             hidden=name.startswith('_'),
-            type=bool if is_bool else func,
+            type=hint,
             has_value=not is_bool,
+            parser=parser,
         ))
     return flags
 
@@ -311,8 +311,13 @@ def command(
         return command
     return decorator
 
+@overload
+def app(name_or_func: Callable) -> App:
+    ...
+
+@overload
 def app(
-    name:         Optional[str]  = None,
+    name_or_func: Optional[str]  = None,
     usage:        Optional[str]  = None,
     version:      Optional[str]  = None,
     argsusage:    Optional[str]  = None,
@@ -323,6 +328,20 @@ def app(
     allow_parent: bool           = False,
     **kwargs:     Any,
 ) -> AppFunc:
+    ...
+
+def app(
+    name_or_func: Union[Callable, Optional[str]] = None,
+    usage:        Optional[str]  = None,
+    version:      Optional[str]  = None,
+    argsusage:    Optional[str]  = None,
+    description:  Optional[str]  = None,
+    email:        Optional[str]  = None,
+    authors:      Optional[list] = None,
+    copyright:    Optional[str]  = None,
+    allow_parent: bool           = False,
+    **kwargs:     Any,
+) -> Union[App, AppFunc]:
     """
     dynamically generate a simple cli-application from the decorated function
 
@@ -338,6 +357,8 @@ def app(
     :param kwargs:       additonal keyword arguments to pass to app definiton
     :return:             decorator that returns generated application object
     """
+    func = name_or_func if callable(name_or_func) else None
+    name = None if callable(name_or_func) else name_or_func
     def decorator(func: Callable) -> App:
         cname     = name or func.__name__.strip('_')
         main, ctx = action(func, is_app=True)
@@ -355,4 +376,4 @@ def app(
             flags=ctx.flags,
             **kwargs,
         )
-    return decorator
+    return decorator if func is None else decorator(func)

@@ -1,15 +1,15 @@
 """
-application definition which determines behavior and handling of arguments
+CLI Application Definition/Implementation
 """
 import sys
 import asyncio
-from typing import Callable, Optional, List, Coroutine, TextIO
+from typing import Callable, Optional, List, TextIO
 
 from .abc import *
 from .flag import Flags
 from .command import Command
 from .help import help_action, help_flag, help_command
-from .parser import run_app, EX_USAGE, EX_UNAVAILABLE
+from .parser import run_app, EX_USAGE, EX_UNAVAILABLE, EX_CONFIG
 
 #** Variables **#
 __all__ = [
@@ -21,13 +21,13 @@ __all__ = [
 ]
 
 #: definition for usage-error function
-UsageErrorFunc = Callable[[Context, Command, str], None]
+UsageErrorFunc = Callable[[UsageError], None]
 
 #: definition for exit-error function
-ExitErrorFunc  = Callable[[Context, Command, str, int], None]
+ExitErrorFunc  = Callable[[ExitError], None]
 
 #: defintion for command-not-found function
-NotFoundFunc = Callable[[Context, Command, str], None]
+NotFoundFunc = Callable[[NotFoundError], None]
 
 #** Functions **#
 
@@ -92,7 +92,6 @@ class App(AbsApplication, Command):
         on_usage_error:    Optional[UsageErrorFunc] = None,
         exit_with_error:   Optional[ExitErrorFunc]  = None,
         not_found_error:   Optional[NotFoundFunc]   = None,
-        run_async:         bool                     = False,
     ):
         super().__init__(
             name=name,
@@ -114,56 +113,53 @@ class App(AbsApplication, Command):
         self.err_writer        = err_writer
         self.help_app_template = help_app_template
         self.help_cmd_template = help_cmd_template
-        self.on_usage_error    = on_usage_error or self.on_usage_error   #type: ignore
-        self.exit_with_error   = exit_with_error or self.exit_with_error #type: ignore
-        self.not_found_error   = not_found_error or self.not_found_error #type: ignore
-        self.run_async         = run_async
+        setattr(self, 'on_usage_error',  on_usage_error or self.on_usage_error)
+        setattr(self, 'exit_with_error', exit_with_error or self.exit_with_error)
+        setattr(self, 'not_found_error', not_found_error or self.not_found_error)
         self.flags.insert(0, help_flag)
         self.commands.insert(0, help_command)
 
-    def on_usage_error(self, ctx: Context, cmd: Command, error: str) -> None:
+    def on_usage_error(self, err: UsageError):
         """
         handles usage errors during parsing or from context
 
-        :param ctx: context of command that raised a usage error
-        :param cmd: command that raised a usage error
-        :param err: message of usage error raised
+        :param err: usage-exception contianing details on error
         """
-        print(f'Incorrect Usage: {error}\n', file=ctx.app.err_writer)
-        help_action(ctx, cmd)
+        print(f'Incorrect Usage: {err.message}\n', file=self.err_writer)
+        help_action(err.context, err.command)
         raise SystemExit(EX_USAGE)
 
-    def exit_with_error(self, ctx: Context, cmd: Command, err: str, code: int) -> None:
+    def exit_with_error(self, err: ExitError):
         """
         handles unrecoverable exceptions that must lead to complete exit
 
-        :param ctx:  context of command that raised an exit error
-        :param cmd:  command that raised an exit error
-        :param err:  message of exit error
-        :param code: exit-code of exit error
+        :param err: exit-exception contianing details on error
         """
-        print(f"App-Error: {err}", file=ctx.app.err_writer)
-        raise SystemExit(code)
+        print(f"App-Error: {err}", file=self.err_writer)
+        raise SystemExit(err.code)
 
-    def not_found_error(self, ctx: Context, cmd: Command, arg: str) -> None:
+    def not_found_error(self, err: NotFoundError):
         """
         handles issues with invalid flags and bad command paths on help
 
-        :param ctx: context of command that raised a not-found error
-        :param cmd: command that raised a not found error
-        :param arg: argument that was not found
+        :param err: not-found-exception contianing details on error
         """
-        if arg.startswith('-'):
-            msg = f'Command: {cmd.name!r}, Invalid Flag: {arg}'
-        else:
-            msg = f'No Help topic for: {arg}'
-        print(msg, file=ctx.app.err_writer)
+        msg = f'No Help topic for: {"->".join(err.path)}'
+        if err.message.startswith('-'):
+            msg = f'Command: {err.command.name}, Invalid Flag: {err.message}'
+        print(msg, file=self.err_writer)
         raise SystemExit(EX_UNAVAILABLE)
+ 
+    def config_error(self, err: ConfigError):
+        """
+        handles issues with app/command configuration errors
 
-    def run(self, 
-        args:      Optional[List[str]] = None,
-        run_async: Optional[bool]      = None,
-    ) -> Optional[Coroutine[None, None, None]]:
+        :param err: config-exception containing details on error
+        """
+        print(f'ConfigError: {err.message}', file=self.err_writer)
+        raise SystemExit(EX_CONFIG)
+
+    def run(self, args: OptStrList = None, run_async: bool = False) -> OptCoroutine:
         """
         run the relevant actions based on the arguments given and app defintions
 
@@ -173,8 +169,7 @@ class App(AbsApplication, Command):
         """
         args   = args if args is not None else sys.argv.copy()
         future = run_app(self, args)
-        rasync = run_async if run_async is not None else self.run_async
-        if rasync:
+        if run_async:
             return future
         # generate new loop and ensure closure reguardless of error
         loop = get_event_loop()
@@ -182,4 +177,3 @@ class App(AbsApplication, Command):
             loop.run_until_complete(future)
         finally:
             loop.close()
-

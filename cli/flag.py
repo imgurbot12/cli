@@ -4,7 +4,7 @@ all possible flags allowed to be passed into application and parsed from args
 from contextlib import contextmanager
 from datetime import timedelta
 from dataclasses import dataclass, field
-from typing import TypeVar, Optional, Any, Union, Type, List, ClassVar
+from typing import Optional, Any, Union, Type, List, ClassVar
 
 from .abc import *
 from .argument import *
@@ -12,7 +12,6 @@ from .argument import *
 #** Variables **#
 __all__ = [
     'Flag',
-
     'BoolFlag',
     'IntFlag',
     'StringFlag',
@@ -23,9 +22,6 @@ __all__ = [
     'EnumFlag',
     'FilePathFlag',
 ]
-
-#: typehint for generic typevar
-T = TypeVar('T')
 
 #** Functions **#
 
@@ -56,16 +52,20 @@ class Flag(AbsFlag[T]):
     """
     name:      str
     type:      Type[T]
-    usage:     Optional[str] = field(default=None,  kw_only=True)
-    default:   Any           = field(default=None,  kw_only=True)
-    hidden:    bool          = field(default=False, kw_only=True)
-    required:  bool          = field(default=False, kw_only=True)
-    has_value: bool          = field(default=True,  kw_only=True)
+    usage:     Optional[str]      = field(default=None,  kw_only=True)
+    default:   Any                = field(default=None,  kw_only=True)
+    hidden:    bool               = field(default=False, kw_only=True)
+    required:  bool               = field(default=False, kw_only=True)
+    has_value: bool               = field(default=True,  kw_only=True)
+    parser:    Optional[TypeFunc] = field(default=None,  kw_only=True) #type: ignore
+
+    def __post_init__(self):
+        self.parser: TypeFunc = self.parser or self.type
 
     def parse(self, value: str) -> T:
         """convert cli-value into the correct-type"""
         with capture_errors():
-            return self.type(value)
+            return self.parser(value)
 
 @dataclass
 class BoolFlag(Flag[bool]):
@@ -77,7 +77,7 @@ class BoolFlag(Flag[bool]):
 @dataclass
 class IntFlag(Flag[int]):
     """implementation for supporting integer flags"""
-    type: ClassVar = int
+    type: ClassVar[Type] = int
 
 @dataclass
 class StringFlag(Flag[str]):

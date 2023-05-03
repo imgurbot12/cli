@@ -75,9 +75,14 @@ class Command(AbsCommand):
         self.flags        = flags or []
         self.commands     = commands or []
         self.allow_parent = allow_parent
-        self.run_before   = wrap_async(before or self.run_before)
-        self.run_action   = wrap_async(action or self.run_action)
-        self.run_after    = wrap_async(after or self.run_after)
+        #NOTE: using setattr to keep mypy from bitching about a func override
+        # related-issue: (https://github.com/python/mypy/issues/2427)
+        setattr(self, 'run_before', wrap_async(before or self.run_before))
+        setattr(self, 'run_action', wrap_async(action or self.run_action))
+        setattr(self, 'run_after',  wrap_async(after or self.run_after))
+ 
+    def __repr__(self) -> str:
+        return f'Command(name={self.name}, aliases={self.aliases!r})'
 
     @property
     def categories(self) -> Dict[str, 'Command']:
@@ -118,15 +123,15 @@ class Command(AbsCommand):
         """
         return [category for category in self.categories.keys()]
 
-    async def run_before(self, ctx: Context): #type: ignore
+    async def run_before(self, _: Context):
         """default before-action function when executing command"""
         pass
 
-    async def run_after(self, ctx: Context): #type: ignore
+    async def run_after(self, _: Context):
         """default after-action function when executing command"""
         pass
 
-    async def run_action(self, ctx: Context) -> Result: #type: ignore
+    async def run_action(self, _: Context) -> Result:
         """default action function when executing command"""
         return NO_ACTION
 
@@ -137,7 +142,7 @@ class Command(AbsCommand):
         :param func: function being assigned to before function
         :return:     wrapped before function
         """
-        self.run_before: AsyncAction = wrap_async(func)
+        setattr(self, 'run_before', wrap_async(func))
         return self.run_before
 
     def action(self, func: Action) -> AsyncAction:
@@ -154,8 +159,8 @@ class Command(AbsCommand):
         # generate new action
         action, ctx = wraps.action(func)
         # save changes to command
-        self.flags      = [*self.original_flags, *ctx.flags]
-        self.run_action: AsyncAction = action
+        self.flags = [*self.original_flags, *ctx.flags]
+        setattr(self, 'run_action', action)
         return self.run_action
 
     def after(self, func: Action) -> AsyncAction:
@@ -165,7 +170,7 @@ class Command(AbsCommand):
         :param func: function being assigned to after function
         :return:     wrapped after function
         """
-        self.run_after: AsyncAction = wrap_async(func)
+        setattr(self, 'run_after', wrap_async(func))
         return self.run_after
 
     @overload
