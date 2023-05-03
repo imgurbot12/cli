@@ -70,7 +70,7 @@ class Command(AbsCommand):
         self.aliases      = aliases or []
         self.usage        = usage
         self.argsuage     = argsusage
-        self.category     = category
+        self.category     = category or '*'
         self.hidden       = hidden
         self.flags        = flags or []
         self.commands     = commands or []
