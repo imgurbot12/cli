@@ -3,68 +3,97 @@ single command defintions used as part of application definition
 """
 import asyncio
 import functools
-from typing import *
-from dataclasses import dataclass, field, InitVar
+from typing import Dict, Optional, List, Callable, Union, cast, overload
 
-from .flag import Flags
-from .context import NO_ACTION, Context, ConfigError
+from .abc import *
 
 #** Variables **#
-__all__ = [
-    'Action',
-    'Commands',
-    'CommandBase',
-    'Command'
-]
-
-#: defintion for any action called in commands
-Action = Callable[[Context], None]
-
-#: defintion for list of commands
-Commands = List['Command']
+__all__ = ['Command']
 
 #** Functions **#
 
 #TODO: run sync cli things in event executor?
 
-def wrap_async(func: Callable) -> Callable:
+def wrap_async(func: Action) -> AsyncAction:
     """ensure actions are run async"""
     if not asyncio.iscoroutinefunction(func):
+        func = cast(SyncAction, func)
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
     return func
 
-def get_action(obj: object, name: str, func: Optional[Callable]) -> Callable:
+def get_action(obj: object, name: str, func: OptAction) -> AsyncAction:
     """ensure action assignment is not pulled from command-base default"""
-    if not func or func is getattr(CommandBase, name):
+    if func is None:
         func = getattr(obj, f'run_{name}')
-        return wrap_async(func)
-    return wrap_async(func)
+    if isinstance(func, Action):
+        return wrap_async(cast(Action, func))
+    raise RuntimeError(f'Invalid Action {name!r} {func!r}')
 
 #** Classes **#
 
-class CommandBase:
-    """baseclass for command handling and attribute retrieval"""
-    flags:    Flags
-    commands: Commands
+class Command(AbsCommand):
+    """
+    Controls Specifications and Behavior of a CLI Command
 
-    def __post_init__(self, before: Action, action: Action, after: Action):
-        """value validation to ensure correctness"""
-        self.run_before = get_action(self, 'before', before)
-        self.run_action = get_action(self, 'action', action)
-        self.run_after  = get_action(self, 'after',  after)
+    :param name:         name of command
+    :param aliases:      name aliases for command
+    :param usage:        usage description 
+    :param argsusage:    argument usage description
+    :param category:     assigned command category
+    :param hidden:       hide command in help if true
+    :param flags:        configured command flags
+    :param commands:     configured subcommands of command
+    :param allow_parent: allow parent to run on child command run
+    :param before:       command before-action function
+    :param action:       command action function
+    :param after:        command after-action function
+    """
+
+    def __init__(self,
+        name:         str,
+        aliases:      Optional[List[str]] = None,
+        usage:        Optional[str]       = None,
+        argsusage:    Optional[str]       = None,
+        category:     Optional[str]       = None,
+        hidden:       bool                = False,
+        flags:        Optional[Flags]     = None,
+        commands:     Optional[Commands]  = None,
+        allow_parent: bool                = False,
+        before:       OptAction           = None,
+        action:       OptAction           = None,
+        after:        OptAction           = None,
+    ):
+        self.name         = name
+        self.aliases      = aliases or []
+        self.usage        = usage
+        self.argsuage     = argsusage
+        self.category     = category or '*'
+        self.hidden       = hidden
+        self.flags        = flags or []
+        self.commands     = commands or []
+        self.allow_parent = allow_parent
+        #NOTE: using setattr to keep mypy from bitching about a func override
+        # related-issue: (https://github.com/python/mypy/issues/2427)
+        setattr(self, 'run_before', wrap_async(before or self.run_before))
+        setattr(self, 'run_action', wrap_async(action or self.run_action))
+        setattr(self, 'run_after',  wrap_async(after or self.run_after))
+ 
+    def __repr__(self) -> str:
+        return f'Command(name={self.name}, aliases={self.aliases!r})'
 
     @property
     def categories(self) -> Dict[str, 'Command']:
         """
-        organize commands into categories
+        organize sub-commands into categories
+
+        :return: dictionary of category names associated w/ sub-commands
         """
         categories = {}
         for cmd in self.commands:
-            if cmd.category not in categories:
-                categories[cmd.category] = []
+            categories.setdefault(cmd.category, [])
             categories[cmd.category].append(cmd)
         return categories
 
@@ -94,29 +123,29 @@ class CommandBase:
         """
         return [category for category in self.categories.keys()]
 
-    async def run_before(self, ctx: Context):
-        """default before command function"""
+    async def run_before(self, _: Context):
+        """default before-action function when executing command"""
         pass
 
-    async def run_action(self, ctx: Context):
-        """default action command function"""
+    async def run_after(self, _: Context):
+        """default after-action function when executing command"""
+        pass
+
+    async def run_action(self, _: Context) -> Result:
+        """default action function when executing command"""
         return NO_ACTION
 
-    async def run_after(self, ctx: Context):
-        """default after command function"""
-        pass
-
-    def before(self, func: Callable) -> Action:
+    def before(self, func: Action) -> AsyncAction:
         """
         decorate the specified function and assign to command `before` action
 
         :param func: function being assigned to before function
         :return:     wrapped before function
         """
-        self.run_before = wrap_async(func)
+        setattr(self, 'run_before', wrap_async(func))
         return self.run_before
 
-    def action(self, func: Callable) -> Action:
+    def action(self, func: Action) -> AsyncAction:
         """
         decorate the specified function and assign to command action
 
@@ -128,23 +157,31 @@ class CommandBase:
         if not hasattr(self, 'original_flags'):
             self.original_flags = self.flags
         # generate new action
-        action = wraps.action(func)
+        action, ctx = wraps.action(func)
         # save changes to command
-        self.flags      = [*self.original_flags, *action.flags]
-        self.run_action = action
+        self.flags = [*self.original_flags, *ctx.flags]
+        setattr(self, 'run_action', action)
         return self.run_action
 
-    def after(self, func: Callable) -> Action:
+    def after(self, func: Action) -> AsyncAction:
         """
         decorate the specified function and assign to command `after` action
 
         :param func: function being assigned to after function
         :return:     wrapped after function
         """
-        self.run_after = wrap_async(func)
+        setattr(self, 'run_after', wrap_async(func))
         return self.run_after
 
-    def command(self, *args: Any, **kwargs: Any) -> 'Command':
+    @overload
+    def command(self, func: Callable) -> AbsCommand:
+        ...
+    
+    @overload
+    def command(self, *args, **kwargs) -> CommandFunc:
+        ...
+
+    def command(self, *args, **kwargs) -> Union[AbsCommand, CommandFunc]:
         """
         add the specified function as a subcommand to the current parent
 
@@ -159,89 +196,3 @@ class CommandBase:
             return decorator(args[0])
         # otherwise call decorator as normal
         return wraps.command(self, *args, **kwargs)
-
-    def validate(self):
-        """
-        validate command settings before being run
-        """
-        # ensure flag-names dont overlap
-        for n, flag in enumerate(self.flags[::-1], 1):
-            for other in self.flags[:-n]:
-                for name in flag.names:
-                    if name in other.names:
-                        raise ConfigError(
-                            f'command {self.name!r} > '
-                            f'flag {flag.name!r} name overlaps {other.name!r}')
-        # ensure command-names don't overlap
-        for n, cmd in enumerate(self.commands[::-1], 1):
-            for other in self.commands[:-n]:
-                if cmd.name == other.name:
-                    raise ConfigError(
-                        f'command {self.name!r} > '
-                        f'subcmd {cmd.name!r} name overlaps: {other.name!r}')
-                for alias in cmd.aliases:
-                    if alias == other.name or alias in other.aliases:
-                        raise ConfigError(
-                            f'cmd {self.name!r} > subcmd {cmd.name!r} '
-                            f'alias {alias!r} overlaps: {other.name!r}')
-        # validate subcommands as well
-        for cmd in self.commands:
-            cmd.validate()
-
-@dataclass
-class Command(CommandBase):
-    """
-    controls specifications and behavior of a cli command
-    
-    :param name:         name of command
-    :param aliases:      name aliases for command
-    :param usage:        usage description 
-    :param argsusage:    argument usage description
-    :param category:     assigned command category
-    :param hidden:       hide command in help if true
-    :param flags:        configured command flags
-    :param commands:     configured subcommands of command
-    :param allow_parent: allow parent to run on child command run
-    :param before:       command before-action function
-    :param action:       command action function
-    :param after:        command after-action function
-    """
-
-    name:         str
-    aliases:      List[str]     = field(default_factory=list)
-    usage:        Optional[str] = None
-    argsusage:    Optional[str] = None
-    category:     str           = '*'
-    hidden:       bool          = False
-    flags:        Flags         = field(default_factory=list, repr=False)
-    commands:     Commands      = field(default_factory=list, repr=False)
-    allow_parent: bool          = False
-
-    before: InitVar[Action]
-    action: InitVar[Action]
-    after:  InitVar[Action]
-
-    def to_string(self):
-        """convert command names/alises to string for help formatting"""
-        return ', '.join([self.name, *self.aliases])
-
-    def has_name(self, name: str) -> bool:
-        """
-        return true if command has the given name
-
-        :param name: name being compared to command
-        :return:     true if any names/aliases match
-        """
-        return name == self.name or name in self.aliases
-
-    def index(self, values: List[str]) -> int:
-        """
-        return earliest index of where a command name/alias was found
-
-        :param values: list of strings to be searched
-        :return:       index-num (if found); -1 (if missing)
-        """
-        for n, value in enumerate(values, 0):
-            if value == self.name or value in self.aliases:
-                return n
-        return -1

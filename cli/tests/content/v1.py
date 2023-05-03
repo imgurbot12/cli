@@ -3,12 +3,7 @@ V1 API Application Implementation
 """
 import logging
 
-from ... import (
-    range_args,
-    exact_args,
-    App, Command, 
-    StringFlag, IntFlag, BoolFlag, FilePathFlag,
-)
+from ... import * 
 
 #** Variables **#
 __all__ = ['v1']
@@ -40,8 +35,10 @@ v1 = App(
             name='echo',
             usage='repeat something back to user',
             argsusage='<message...>',
+            before=exact_args(1),
+            action=lambda ctx: print(ctx.args.get(0), file=ctx.app.writer),
             flags=[
-                StringFlag(
+                BoolFlag(
                     name='dry, d',
                     usage='run dry run',
                 ),

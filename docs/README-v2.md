@@ -42,7 +42,7 @@ version (v3). _If you need python 2 support you can use the tagged v1 version br
 
 To install the library just run:
 ```bash
-$ pip3 install git+https://github.com/imgurbot12/cli.git
+$ pip install cli3
 ```
 
 # Support-Platforms

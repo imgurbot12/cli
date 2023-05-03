@@ -6,6 +6,8 @@ import re
 from typing import *
 from datetime import timedelta
 
+from .abc import Context, CliError
+
 #** Variables **#
 __all__ = [
     'TypeFunc',
@@ -37,8 +39,12 @@ TypeFunc = Callable[[str], Any]
 
 #** Exceptions **#
 
-class ArgumentError(ValueError):
-    pass
+class ArgumentError(CliError):
+    def __init__(self, msg: str):
+        self.message = msg
+
+    def __str__(self) -> str:
+        return self.message
 
 #** Functions **#
 
@@ -71,8 +77,11 @@ def parse_duration(duration: str) -> timedelta:
     :param duration: duration string
     :return:         parsed timedelta value
     """
-    match  = re_duration.match(duration).groupdict()
-    kwargs = {k:int(v.strip('wdhms') if v else 0) for k,v in match.items()}
+    match = re_duration.match(duration)
+    if match is None:
+        raise ArgumentError(f'Invalid Duration: {duration!r}')
+    groups = match.groupdict()
+    kwargs = {k:int(v.strip('wdhms') if v else 0) for k,v in groups.items()}
     return timedelta(**kwargs)
 
 def parse_new_file(file: str) -> str:
@@ -115,15 +124,16 @@ def range_args(min: int = 0, max: Optional[int] = None) -> Callable:
     :param max: maximum number of arguments
     :return:    function used to regulate argument numbers
     """
-    def validate_range_args(ctx: 'Context'):
+    def validate_range_args(ctx: Context):
+        cmd = ctx.command.name
         if min < 0 and len(ctx.args) > 0:
-            ctx.on_usage_error('action does not take any arguments')
+            ctx.on_usage_error(f'{cmd!r} does not take any arguments')
         if min > 0 and min == max and len(ctx.args) != min:
-            ctx.on_usage_error(f'action must have exactly {min} arguments')
+            ctx.on_usage_error(f'{cmd!r} must have exactly {min} arguments')
         if min > 0 and len(ctx.args) < min:
-            ctx.on_usage_error(f'action must have at least {min} arguments')
+            ctx.on_usage_error(f'{cmd!r} must have at least {min} arguments')
         if max and len(ctx.args) > max:
-            ctx.on_usage_error(f'action can have at maximum {max} arguments')
+            ctx.on_usage_error(f'{cmd!r} can have at maximum {max} arguments')
     return validate_range_args
 
 def exact_args(num: int) -> Callable:

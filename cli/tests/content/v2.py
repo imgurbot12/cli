@@ -2,6 +2,7 @@
 V2 API Application Implementation
 """
 import logging
+from typing import Optional
 
 from ... import NO_ACTION, Context, app
 
@@ -21,8 +22,8 @@ def v2(*, user: str = 'root', log: int = logging.WARNING, debug: bool = False):
     """
     return NO_ACTION
 
-@v2.command()
-def echo(ctx: Context, message: str, *, dry: bool = False, file: str = None):
+@v2.command
+def echo(ctx: Context, message: str, *, dry: bool = False, file: Optional[str] = None):
     """
     repeat something back to the user
 
@@ -56,7 +57,7 @@ def run(ctx: Context, miles: int, *, km: bool = False):
     if ctx.parent.get('kill'):
         print('and dies...', file=ctx.app.writer)
 
-@docmd.command()
+@docmd.command
 def fly(ctx: Context, miles: int, miles2: int = 0, *, km: bool = False):
     """
     fly x number of miles
