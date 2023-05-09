@@ -19,6 +19,7 @@ __all__ = [
     'parse_new_file',
     'parse_existing_file',
     'parse_list_function',
+    'parse_bytes_function',
 
     'range_args',
     'exact_args',
@@ -115,6 +116,17 @@ def parse_list_function(typefunc: TypeFunc, origin: type = list) -> TypeFunc:
     :return:         function to parse a list into a list of a specified type
     """
     return lambda l: origin([typefunc(v) for v in l.split(',')])
+
+def parse_bytes_function(origin: Union[Type[bytes], Type[bytearray]]) -> TypeFunc:
+    """
+    generate bytes parser for the following type
+
+    :param origin: type to convert into
+    :return:       function to parse string into bytes/bytearray
+    """
+    if origin == bytes:
+        return lambda s: s.encode()
+    return lambda s: bytearray(s.encode())
 
 def range_args(min: int = 0, max: Optional[int] = None) -> Callable:
     """

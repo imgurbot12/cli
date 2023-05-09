@@ -83,8 +83,10 @@ def compile_typehint(attr: str, hint: Any, depth: int = 0) -> Optional[TypeFunc]
     if hint in (Context, ):
         return
     # parse basic typehints
-    if hint in (str, bytes, bytearray, int, float):
+    if hint in (str, int, float):
         return hint
+    if hint in (bytes, bytearray):
+        return parse_bytes_function(hint)
     if hint in (set, list, tuple):
         return parse_list_function(str, hint)
     if hint == bool:
