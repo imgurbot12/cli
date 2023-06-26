@@ -3,10 +3,12 @@ Abstract/BaseClass Instances/Protocols
 """
 from abc import abstractmethod
 from collections import UserList
-from dataclasses import dataclass, field
 from functools import cached_property
 from typing import *
+from typing import TextIO
 from typing_extensions import Self
+
+from pyderive import dataclass, field
 
 #** Variables **#
 __all__ = [
@@ -186,7 +188,7 @@ class Args(UserList):
             raise ValueError("index out of range")
         self[fromidx], self[toidx] = self[toidx], self[fromidx]
 
-@dataclass
+@dataclass(slots=True)
 class Context:
     """Context-Object to Pass Information into/from Various Command Actions"""
     app:          'AbsApplication'    = field(repr=False)

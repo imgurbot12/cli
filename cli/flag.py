@@ -3,8 +3,9 @@ all possible flags allowed to be passed into application and parsed from args
 """
 from contextlib import contextmanager
 from datetime import timedelta
-from dataclasses import dataclass, field
 from typing import Optional, Any, Union, Type, List, ClassVar
+
+from pyderive import dataclass, field
 
 from .abc import *
 from .argument import *
@@ -37,7 +38,7 @@ def capture_errors():
 
 #TODO: move flag validation to app setup and execution
 
-@dataclass
+@dataclass(slots=True)
 class Flag(AbsFlag[T]):
     """
     baseclass Flag declaration
@@ -67,29 +68,26 @@ class Flag(AbsFlag[T]):
         with capture_errors():
             return self.parser(value)
 
-@dataclass
+@dataclass(slots=True)
 class BoolFlag(Flag[bool]):
     """implementation for supporting boolean flags"""
     type:      ClassVar[Type] = bool
     default:   bool           = False
     has_value: bool           = False
 
-@dataclass
 class IntFlag(Flag[int]):
     """implementation for supporting integer flags"""
     type: ClassVar[Type] = int
 
-@dataclass
 class StringFlag(Flag[str]):
     """implementation for supporting string flags"""
     type: ClassVar[Type] = str
 
-@dataclass
 class FloatFlag(Flag[float]):
     """implementation for supporting flag flags"""
     type: ClassVar[Type] = float
 
-@dataclass
+@dataclass(slots=True)
 class DecimalFlag(Flag[float]):
     """
     implementation for supporting controlable decimal flags
@@ -104,7 +102,6 @@ class DecimalFlag(Flag[float]):
         with capture_errors():
             return parse_decimal(value, self.decimal)
 
-@dataclass
 class ListFlag(Flag[List[str]]):
     """implementatin for supporting list flags"""
     type: ClassVar[Type] = list
@@ -114,7 +111,6 @@ class ListFlag(Flag[List[str]]):
         with capture_errors():
             return [c.strip() for c in value.split(',')]
 
-@dataclass
 class DurationFlag(Flag[timedelta]):
     """implementation for supporting time-duration flags"""
     type: ClassVar[Type] = timedelta
@@ -124,7 +120,7 @@ class DurationFlag(Flag[timedelta]):
         with capture_errors():
             return parse_duration(value)
 
-@dataclass
+@dataclass(slots=True)
 class EnumFlag(Flag[Any]):
     """
     implementation for supporting enum-value flags
@@ -141,7 +137,7 @@ class EnumFlag(Flag[Any]):
                 return
             return self.enum[value] if isinstance(self.enum, dict) else value
 
-@dataclass
+@dataclass(slots=True)
 class FilePathFlag(Flag[str]):
     """
     implementation for supporting existing/new file-paths

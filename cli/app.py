@@ -42,7 +42,7 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
 
 #** Classes **#
 
-class App(AbsApplication, Command):
+class App(Command, AbsApplication):
     """
     application determines handling of arguments and stores metadata
 
