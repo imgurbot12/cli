@@ -75,14 +75,17 @@ class BoolFlag(Flag[bool]):
     default:   bool           = False
     has_value: bool           = False
 
+@dataclass(slots=True)
 class IntFlag(Flag[int]):
     """implementation for supporting integer flags"""
     type: ClassVar[Type] = int
 
+@dataclass(slots=True)
 class StringFlag(Flag[str]):
     """implementation for supporting string flags"""
     type: ClassVar[Type] = str
 
+@dataclass(slots=True)
 class FloatFlag(Flag[float]):
     """implementation for supporting flag flags"""
     type: ClassVar[Type] = float
@@ -102,6 +105,7 @@ class DecimalFlag(Flag[float]):
         with capture_errors():
             return parse_decimal(value, self.decimal)
 
+@dataclass(slots=True)
 class ListFlag(Flag[List[str]]):
     """implementatin for supporting list flags"""
     type: ClassVar[Type] = list
@@ -111,6 +115,7 @@ class ListFlag(Flag[List[str]]):
         with capture_errors():
             return [c.strip() for c in value.split(',')]
 
+@dataclass(slots=True)
 class DurationFlag(Flag[timedelta]):
     """implementation for supporting time-duration flags"""
     type: ClassVar[Type] = timedelta
