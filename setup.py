@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='cli3',
-    version='1.1.2',
+    version='1.1.3',
     license='MIT',
     packages=find_packages(),
     url='https://github.com/imgurbot12/cli',
@@ -18,7 +18,11 @@ setup(
     python_requires='>=3.7',
     long_description=readme,
     long_description_content_type="text/markdown",
-    install_requires=['jinja2', 'pyderive3'],
+    install_requires=[
+        'jinja2>=3.1.2',
+        'pyderive3>=0.0.6',
+        'typing_extensions>=4.7.1',
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
