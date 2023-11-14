@@ -143,12 +143,14 @@ def has_help_flag(gflags: dict) -> bool:
     """
     return bool(gflags.get(help_flag.long))
 
-async def exec_app(app: AbsApplication, args: List[str]):
+async def exec_app(app: AbsApplication, args: List[str],
+    extra_flags: OptFlagDict = None):
     """
     iterate args until given commands and correlated flags are executed
 
-    :param app:     application w/ flag/command definitions
-    :param args:    arguments to parse according to app definition
+    :param app:         application w/ flag/command definitions
+    :param args:        arguments to parse according to app definition
+    :param extra_flags: extra global flags to pass into app runtime
     """
     # validate application configuration before executing
     validate_cmd(app)
@@ -168,7 +170,8 @@ async def exec_app(app: AbsApplication, args: List[str]):
         flags = parse_flags(command.flags, values, context, command)
         # pass content into new context
         if global_flags is None:
-            global_flags = flags
+            global_flags = extra_flags or {}
+            global_flags.update(flags)
         values  = Args(values)
         context = Context(app, command, parent, global_flags, flags, values)
         # only run command if no subcommand is present or parent is allowed
@@ -184,15 +187,17 @@ async def exec_app(app: AbsApplication, args: List[str]):
     elif funcret == NO_ACTION:
         raise UsageError('no action taken', context, command)
 
-async def run_app(app: AbsApplication, args: List[str]):
+async def run_app(app: AbsApplication, args: List[str], 
+    extra_flags: OptFlagDict = None):
     """
     wrap app execution/iteration w/ standard application error-handlers
 
-    :param app:  application w/ flag/command definitions
-    :param args: arguments to parse according to app definition
+    :param app:         application w/ flag/command definitions
+    :param args:        arguments to parse according to app definition
+    :param extra_flags: extra global flags to pass into app runtime
     """
     try:
-        await exec_app(app, args) 
+        await exec_app(app, args, extra_flags) 
     except UsageError as e:
         app.on_usage_error(e)
     except ExitError as e:

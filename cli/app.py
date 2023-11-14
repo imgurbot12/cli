@@ -3,7 +3,7 @@ CLI Application Definition/Implementation
 """
 import sys
 import asyncio
-from typing import Callable, Optional, List, TextIO
+from typing import Callable, Optional, List, TextIO, overload
 
 from .abc import *
 from .flag import Flags
@@ -28,6 +28,7 @@ ExitErrorFunc  = Callable[[ExitError], None]
 
 #: defintion for command-not-found function
 NotFoundFunc = Callable[[NotFoundError], None]
+
 
 #** Functions **#
 
@@ -159,16 +160,31 @@ class App(Command, AbsApplication):
         print(f'ConfigError: {err.message}', file=self.err_writer)
         raise SystemExit(EX_CONFIG)
 
-    def run(self, args: OptStrList = None, run_async: bool = False) -> OptCoroutine:
+    @overload
+    def run(self, args: OptStrList = None, flags: OptFlagDict = None,
+        run_async: bool = True) -> SimpleCo:
+        ...
+
+    @overload
+    def run(self, args: OptStrList = None, flags: OptFlagDict = None,
+        run_async: bool = False) -> None:
+        ...
+
+    def run(self, 
+        args:      OptStrList = None,
+        flags:     OptFlagDict = None,
+        run_async: bool = False
+    ) -> OptCoroutine:
         """
         run the relevant actions based on the arguments given and app defintions
 
         :param args:      args being parsed and passed into relevant actions
+        :param flags:     pass additional global flags on startup
         :param run_async: override app run_async setting
         :return:          asyncio coroutine if run_async=True
         """
         args   = args if args is not None else sys.argv.copy()
-        future = run_app(self, args)
+        future = run_app(self, args, extra_flags=flags)
         if run_async:
             return future
         # generate new loop and ensure closure reguardless of error

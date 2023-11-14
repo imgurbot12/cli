@@ -21,9 +21,11 @@ __all__ = [
     'OptAction',
     'Flags',
     'FlagDict',
+    'OptFlagDict',
     'Commands',
     'AppFunc',
     'CommandFunc',
+    'SimpleCo',
     'OptCoroutine',
     'OptStrList',
 
@@ -68,6 +70,9 @@ Flags = List['AbsFlag']
 #: definition for flags organized into a dictionary
 FlagDict = Dict[str, Any]
 
+#: defintion for optional flag dictionary
+OptFlagDict = Optional[FlagDict]
+
 #: defintion for list of commands
 Commands = List['AbsCommand']
 
@@ -77,8 +82,11 @@ AppFunc = Callable[[Callable], 'AbsApplication']
 #: type definition command function
 CommandFunc = Callable[[Callable], 'AbsCommand']
 
+#: Simple Coroutine w/ No Returns
+SimpleCo = Coroutine[None, None, None]
+
 #: type definition for optional empty coroutine
-OptCoroutine = Optional[Coroutine[None, None, None]]
+OptCoroutine = Optional[SimpleCo]
 
 #: type definition for optional list of strings
 OptStrList = Optional[List[str]]
