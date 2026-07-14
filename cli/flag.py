@@ -1,159 +1,102 @@
 """
-all possible flags allowed to be passed into application and parsed from args
+CLI Flag Implementation
 """
-from contextlib import contextmanager
-from datetime import timedelta
-from typing import Optional, Any, Union, Type, List, ClassVar
+from typing import (
+    Any, Callable, Generic, List, Literal, Optional, Tuple, Type,
+    cast, get_args)
 
-from pyderive import dataclass, field
-
-from .abc import *
-from .argument import *
+from . import T, SuggestFunc, get_type, get_validator
 
 #** Variables **#
-__all__ = [
-    'Flag',
-    'BoolFlag',
-    'IntFlag',
-    'StringFlag',
-    'FloatFlag',
-    'DecimalFlag',
-    'ListFlag',
-    'DurationFlag',
-    'EnumFlag',
-    'FilePathFlag',
-]
+__all__ = ['Flag', 'Flags']
+
+Flags = List['Flag']
+Short = Literal[
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
 
 #** Functions **#
 
-@contextmanager
-def capture_errors():
-    """simple context-manager to capture any conversion errors"""
-    try:
-        yield None
-    except Exception:
-        pass
+def flag_default(type: Type[T], value: Any) -> Optional[T]:
+    """
+    determine default based on type and value
+    """
+    if type is bool and value is None:
+        return cast(T, False)
+    return value
+
+def parse_short(name: str) -> Tuple[str, Optional[Short]]:
+    """
+    parse short included with name (if specified)
+
+    example: `name, n` = (long=name, short=n)
+    """
+    comma = name.count(',')
+    if comma > 1:
+        raise ValueError(f'Invalid flag name: {name!r}')
+    if comma == 0:
+        return (name, None)
+    long, short = name.split(',', 1)
+    long, short = long.strip(), short.strip()
+    if short not in get_args(Short):
+        raise ValueError(f'Invalid short flag: {short!r}')
+    return (long, cast(Short, short))
 
 #** Classes **#
 
-#TODO: move flag validation to app setup and execution
-
-@dataclass(slots=True)
-class Flag(AbsFlag[T]):
+class Flag(Generic[T]):
     """
-    baseclass Flag declaration
-    
-    :param name:      name of flag
-    :param usage:     usage description
-    :param default:   default value
-    :param hidden:    hide flag in help if true
-    :param required:  ensure flag has value before allowing action
-    :param type:      supported type for flag
-    :param has_value: internal tracker if flag does not have a value
     """
-    name:      str
-    type:      Type[T]
-    usage:     Optional[str]      = field(default=None,  kw_only=True)
-    default:   Any                = field(default=None,  kw_only=True)
-    hidden:    bool               = field(default=False, kw_only=True)
-    required:  bool               = field(default=False, kw_only=True)
-    has_value: bool               = field(default=True,  kw_only=True)
-    parser:    Optional[TypeFunc] = field(default=None,  kw_only=True) #type: ignore
+    type: Type[T]
 
-    def __post_init__(self):
-        self.parser: TypeFunc = self.parser or self.type
+    def __init__(self,
+        name:       str,
+        about:      Optional[str]                      = None,
+        default:    Optional[T]                        = None,
+        required:   bool                               = False,
+        repeat:     bool                               = False,
+        short:      Optional[Short]                    = None,
+        long:       Optional[str]                      = None,
+        hidden:     bool                               = False,
+        validators: Optional[List[Callable[[Any], T]]] = None,
+        suggestor:  Optional[SuggestFunc]              = None,
+        type:       Optional[Type[T]]                  = None,
+    ):
+        name, name_short = parse_short(name)
+        self.name        = name
+        self.about       = about or ''
+        self.required    = required
+        self.repeat      = repeat
+        self.short       = short or name_short
+        self.long        = long or name
+        self.hidden      = hidden
+        self.validators  = validators or []
+        self.suggestor   = suggestor
+        self.type        = get_type(self, type)
+        self.validators  = get_validator(self.type, self.validators)
+        self.default     = flag_default(self.type, default)
 
-    def parse(self, value: str) -> T:
-        """convert cli-value into the correct-type"""
-        with capture_errors():
-            return self.parser(value)
+    def __repr__(self) -> str:
+        attrs = {'name': self.name, 'short': self.short, 'long': self.long}
+        items = ', '.join(f'{k}={v}' for k,v in attrs.items() if v)
+        return f'Flag({items})'
 
-@dataclass(slots=True)
-class BoolFlag(Flag[bool]):
-    """implementation for supporting boolean flags"""
-    type:      ClassVar[Type] = bool
-    default:   bool           = False
-    has_value: bool           = False
+    @classmethod
+    def __class_getitem__(cls, value: Type):
+        func     = getattr(super(), '__class_getitem__')
+        instance = func(value)
+        instance.type = value
+        return instance
 
-@dataclass(slots=True)
-class IntFlag(Flag[int]):
-    """implementation for supporting integer flags"""
-    type: ClassVar[Type] = int
+    def _requires_value(self) -> bool:
+        """
+        """
+        return self.type is not bool
 
-@dataclass(slots=True)
-class StringFlag(Flag[str]):
-    """implementation for supporting string flags"""
-    type: ClassVar[Type] = str
-
-@dataclass(slots=True)
-class FloatFlag(Flag[float]):
-    """implementation for supporting flag flags"""
-    type: ClassVar[Type] = float
-
-@dataclass(slots=True)
-class DecimalFlag(Flag[float]):
-    """
-    implementation for supporting controlable decimal flags
-
-    :param decimal: number of allowed decimal places
-    """
-    type:    ClassVar[Type] = float
-    decimal: int            = 2
-
-    def parse(self, value: str):
-        """handle float founding based on decimal setting"""
-        with capture_errors():
-            return parse_decimal(value, self.decimal)
-
-@dataclass(slots=True)
-class ListFlag(Flag[List[str]]):
-    """implementatin for supporting list flags"""
-    type: ClassVar[Type] = list
-
-    def parse(self, value: str):
-        """convert value into list object"""
-        with capture_errors():
-            return [c.strip() for c in value.split(',')]
-
-@dataclass(slots=True)
-class DurationFlag(Flag[timedelta]):
-    """implementation for supporting time-duration flags"""
-    type: ClassVar[Type] = timedelta
-
-    def parse(self, value: str):
-        """convert string-value into timedelta"""
-        with capture_errors():
-            return parse_duration(value)
-
-@dataclass(slots=True)
-class EnumFlag(Flag[Any]):
-    """
-    implementation for supporting enum-value flags
-
-    :param enum: enumeration allowed of allowed values in flag
-    """
-    type: ClassVar[Type] = Any
-    enum: Union[set, dict]
-    
-    def parse(self, value: str) -> Optional[Any]:
-        """ensure the specified value is included in the enum"""
-        with capture_errors():
-            if value not in self.enum:
-                return
-            return self.enum[value] if isinstance(self.enum, dict) else value
-
-@dataclass(slots=True)
-class FilePathFlag(Flag[str]):
-    """
-    implementation for supporting existing/new file-paths
-
-    :param exists: ensure file exists if true
-    """
-    type:   ClassVar[Type] = str
-    exists: bool           = True
-
-    def parse(self, value: str) -> str:
-        """ensure filepath exists or doesn't exist based on `exists` setting"""
-        if self.exists:
-            return parse_existing_file(value)
-        return parse_new_file(value)
+    def variants(self) -> List[str]:
+        """
+        """
+        names = [f'--{self.long}']
+        if self.short is not None:
+            names.insert(0, f'-{self.short}')
+        return names

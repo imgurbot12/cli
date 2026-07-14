@@ -1,6 +1,10 @@
+"""
+CLI Implementation UnitTests
+"""
 
 #** Variables **#
-__all__ = ['TestAppV1', 'TestAppV2']
+__all__ = ['ParserTests', 'SuggestTests']
 
 #** Imports **#
-from .app import TestAppV1, TestAppV2
+from .parser import ParserTests
+from .suggest import SuggestTests

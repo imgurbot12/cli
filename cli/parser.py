@@ -1,208 +1,274 @@
 """
-argument parsing logic and handling to run application as defined
 """
-from typing import List, Optional, NamedTuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-from .abc import *
-from .help import help_flag, help_action
+from . import MISSING, T
+from .arg import Arg
+from .command import Command
+from .flag import Flag
 
 #** Variables **#
-__all__ = [
-    'validate_cmd',
-    'exec_app',
-    'run_app',
+__all__ = ['Parser', 'ParsedCmd']
 
-    'EX_USAGE',
-    'EX_UNAVAILABLE',
-    'EX_CONFIG'
-]
-
-# exit codes stolen from sysexists.h (/usr/include/sysexits.h)
-EX_USAGE       = 64  #- command line usage error -#
-EX_UNAVAILABLE = 69  #- service unavailable -#
-EX_CONFIG      = 78  #- configuration error -#
-
-class SplitArgs(NamedTuple):
-    next:      Optional[AbsCommand]
-    collected: List[str]
-    remaining: List[str]
+ArgValue   = Union[str, None, Type[MISSING]]
+FlagValues = Union[List[Optional[str]], Type[MISSING]]
 
 #** Functions **#
 
-def validate_cmd(command: AbsCommand):
+def index_flags(flags: List[Flag], args: List[str]) -> List[Tuple[int, Flag]]:
     """
-    validate command object to avoid configuration errors
+    """
+    flags   = flags.copy()
+    indexes = []
+    for arg_idx, arg in enumerate(args, 0):
+        if arg == '--':
+            break
+        for flag_idx, flag in enumerate(flags, 0):
+            if arg not in flag.variants():
+                continue
+            indexes.append((arg_idx, flag))
+            if not flag.repeat:
+                flags.pop(flag_idx)
+            break
+    return indexes
 
-    :param cmd: command object to validate
+def index_commands(
+    commands: List[Command], args: List[str]) -> List[Tuple[int, Command]]:
     """
-    # ensure flag-names dont overlap
-    for n in range(len(command.flags)-1, 0, -1):
-        flag = command.flags[n]
-        for other in command.flags[:n]:
-            for name in flag.names:
-                if name in other.names:
-                    raise ConfigError(
-                        f'command {command.name!r} > flag {flag.display!r} '
-                        f'name overlaps {other.display!r}', command)
-    # ensure command-names don't overlap
-    for n in range(len(command.commands)-1, 0, -1):
-        cmd = command.commands[n]
-        for other in command.commands[:n]:
-            if cmd.name == other.name:
-                raise ConfigError(
-                    f'command {command.name!r} > subcmd '
-                    f'{cmd.name!r} name overlaps: {other.name!r}', command)
-            for alias in cmd.aliases:
-                if alias == other.name or alias in other.aliases:
-                    raise ConfigError(
-                        f'cmd {command.name!r} > subcmd {cmd.name!r} '
-                        f'alias {alias!r} overlaps: {other.name!r}', command)
-    # validate subcommands as well
-    for cmd in command.commands:
-        validate_cmd(cmd)
+    """
+    commands = commands.copy()
+    indexes  = []
+    for arg_idx, arg in enumerate(args, 0):
+        if arg == '--':
+            break
+        for cmd_idx, command in enumerate(commands, 0):
+            if command.name != arg and arg not in command.aliases:
+                continue
+            indexes.append((arg_idx, command))
+            commands.pop(cmd_idx)
+            break
+    return indexes
 
-def split_arguments(cmd: AbsCommand, args: List[str]) -> SplitArgs:
-    """
-    split arguments into current command values and next command arguments
+#** Classes **#
 
-    :param cmd:  command being evaluated for currently
-    :param args: args to split into related values and non-related values
-    :return:     (next-command <if any>, related-values, unrelated-values)
-    """
-    args.pop(0)
-    next:  Optional[AbsCommand] = None
-    index: int = len(args)
-    for command in cmd.commands:
-        idx = command.index(args)
-        if idx is not None and idx <= index:
-            next  = command
-            index = idx
-    return SplitArgs(next, args[:index], args[index:])
+@dataclass(slots=True)
+class ParsedCmd:
+    source:   Command
+    args:     Dict[str, Any]
+    commands: Dict[str, 'ParsedCmd']
+    flags:    Dict[str, Any]
 
-def parse_flags(
-    flags: Flags, args: List[str], ctx: Context, cmd: AbsCommand) -> FlagDict:
+class Context:
     """
-    parse values for flag-values based on flag definitions
+    """
+    __slots__ = ('path', 'missing', 'unexpected')
 
-    :param flags: flags to scan arguments for
-    :param args:  all arguments to be parsed for flag-values
-    :return:      dictionary of flag-names to flag-values
-    """
-    # collect indexes or defaults
-    (fdict, indexes) = ({}, [])
-    for flag in flags:
-        index = flag.index(args)
-        # if flag is not present
-        if index is None:
-            # if flag has default
-            if flag.default is not None:
-                fdict[flag.long] = flag.default
-            # if flag is required
-            elif flag.required:
-                raise UsageError(f'flag {flag.display!r} is required', ctx, cmd)
-            continue
-        # check if flag appears more than once
-        plusone = index+1
-        if flag.index(args[plusone:]) is not None:
-            raise UsageError(
-                f'flag {flag.display!r} declared more than once', ctx, cmd)
-        # raise error if indexes overlap or value isnt given
-        if flag.has_value and (len(args) <= plusone or plusone in indexes):
-            raise UsageError(
-                f'flag {flag.display!r} no value specified', ctx, cmd)
-        # append index otherwise
-        indexes.append((flag, index))
-    # collect values from indexes (from highest to lowest)
-    for flag, idx in sorted(indexes, key=lambda x: x[1], reverse=True):
-        # attempt to get value, convert, and set in values
-        if flag.has_value:
-            # attempt to parse value
-            raw = args.pop(idx+1)
-            val = flag.parse(raw)
-            if val is None:
-                raise UsageError(
-                    f'flag {flag.display!r} decode fail: {raw!r}', ctx, cmd)
-            fdict[flag.long] = val
-        # if no-value is possible, set to true
-        else:
-            fdict[flag.long] = True
-        args.pop(idx)
-    # iterate the arguments for any non-parsed flags
-    for arg in args:
-        if arg.startswith('-'):
-            raise NotFoundError(arg, [], ctx, cmd)
-    # return parsed values
-    return fdict
+    path:       List[Command]
+    missing:    List[Union[Arg, Flag, Command]]
+    unexpected: List[str]
 
-def has_help_flag(gflags: dict) -> bool:
-    """
-    check if the given global flags contain the help flag
+    def __init__(self, path: List[Command]):
+        self.path       = path
+        self.missing    = []
+        self.unexpected = []
 
-    :param gflags: parsed global flags
-    :return:       true if `help` flag is found
-    """
-    return bool(gflags.get(help_flag.long))
+    def __repr__(self) -> str:
+        path = [c.name for c in self.path]
+        return f'Context(path={path})'
 
-async def exec_app(app: AbsApplication, args: List[str],
-    extra_flags: OptFlagDict = None):
-    """
-    iterate args until given commands and correlated flags are executed
+    @property
+    def command(self) -> Command:
+        """
+        """
+        return self.path[-1]
 
-    :param app:         application w/ flag/command definitions
-    :param args:        arguments to parse according to app definition
-    :param extra_flags: extra global flags to pass into app runtime
-    """
-    # validate application configuration before executing
-    validate_cmd(app)
-    # run application
-    context: Context    = Context(app, app)
-    command: AbsCommand = app
-    # evaluate and run commands based on cli data
-    next_cmd:     Optional[AbsCommand] = app
-    funcret:      Result               = None
-    global_flags: Optional[FlagDict]   = None
-    help_flag:    bool                 = False
-    while next_cmd is not None:
-        (command, parent) = (next_cmd, context)
-        # split args into next-command args and current args
-        next_cmd, values, args = split_arguments(command, args)
-        # collect flags from values
-        flags = parse_flags(command.flags, values, context, command)
-        # pass content into new context
-        if global_flags is None:
-            global_flags = extra_flags or {}
-            global_flags.update(flags)
-        values  = Args(values)
-        context = Context(app, command, parent, global_flags, flags, values)
-        # only run command if no subcommand is present or parent is allowed
-        help_flag = help_flag or has_help_flag(global_flags)
-        if (next_cmd is None and not help_flag) or command.allow_parent:
-            await command.run_before(context)
-            funcret = await command.run_action(context)
-            await command.run_after(context)
-    # raise help if help-flag was given
-    if help_flag:
-        help_action(context, command)
-    # raise help if no action was taken at all
-    elif funcret == NO_ACTION:
-        raise UsageError('no action taken', context, command)
+    def stack(self, command: Command) -> 'Context':
+        """
+        """
+        return self.__class__([*self.path, command])
 
-async def run_app(app: AbsApplication, args: List[str], 
-    extra_flags: OptFlagDict = None):
-    """
-    wrap app execution/iteration w/ standard application error-handlers
+    def splice_args(self, array: List[T],
+        index: int, length: Optional[int] = None) -> List[T]:
+        """
+        """
+        end    = (index + length) if length is not None else len(array)
+        splice = array[index:end]
+        array[index:end] = []
+        return splice
 
-    :param app:         application w/ flag/command definitions
-    :param args:        arguments to parse according to app definition
-    :param extra_flags: extra global flags to pass into app runtime
+    def add_missing(self, *missing: Union[Arg, Flag, Command]):
+        """
+        """
+        self.missing.extend(missing)
+
+    def add_unexpected(self, *unexpected: str):
+        """
+        """
+        self.unexpected.extend(unexpected)
+
+    def finalize(self):
+        """
+        """
+        if self.unexpected:
+            raise Unexpected(self, self.unexpected)
+        if self.missing:
+            command = [m for m in self.missing if isinstance(m, Command)]
+            if command:
+                raise CommandRequired(self, command[0].commands)
+            raise Missing(self, cast(List[Union[Arg, Flag]], self.missing))
+
+class ParseError(Exception):
+
+    def __init__(self, ctx: Context, *args):
+        super().__init__(ctx, *args)
+        self.ctx = ctx
+
+class CommandRequired(ParseError):
+    def __init__(self, ctx: Context, commands: List[Command]):
+        super().__init__(ctx, commands)
+        self.commands = commands
+
+class Missing(ParseError):
+    def __init__(self, ctx: Context, missing: List[Union[Arg, Flag]]):
+        super().__init__(ctx, missing)
+        self.missing = missing
+
+class Unexpected(ParseError):
+    def __init__(self, ctx: Context, unexpected: List[str]):
+        super().__init__(ctx, unexpected)
+        self.unexpected = unexpected
+
+class Parser:
     """
-    try:
-        await exec_app(app, args, extra_flags) 
-    except UsageError as e:
-        app.on_usage_error(e)
-    except ExitError as e:
-        app.exit_with_error(e)
-    except NotFoundError as e:
-        app.not_found_error(e)
-    except ConfigError as e:
-        app.config_error(e)
+    """
+    __slots__ = ('command', )
+
+    def __init__(self, command: Command):
+        self.command = command
+        self.command.validate()
+
+    def validate_arg(self,
+        ctx: Context, arg: Arg, value: ArgValue, error_flags: bool) -> Any:
+        """
+        """
+        if value is MISSING:
+            return ctx.add_missing(arg) if arg.required else arg.default
+
+        if error_flags and isinstance(value, str) and value.startswith('-'):
+            return ctx.add_unexpected(value)
+
+        for validator in arg.validators:
+            value = validator(value)
+        return value
+
+    def validate_flag(self, ctx: Context, flag: Flag, values: FlagValues) -> Any:
+        """
+        """
+        if values is MISSING:
+            return ctx.add_missing(flag) if flag.required else flag.default
+
+        values = cast(List[Optional[str]], values)
+        if flag._requires_value() and any(v is None for v in values):
+            return ctx.add_missing(flag)
+
+        parsed = []
+        for value in values:
+            if value is None:
+                parsed.append(flag.default if flag._requires_value() else True)
+                continue
+            for validator in flag.validators:
+                value = validator(value)
+            parsed.append(value)
+        return parsed if flag.repeat else parsed[0]
+
+    def split_args(self, ctx: Context,
+        cmdargs: List[Arg], args: List[str]) -> Dict[str, Any]:
+        """
+        """
+        values      = {}
+        cmdargs     = cmdargs.copy()
+        error_flags = True
+        while cmdargs and args:
+            cmdarg = cmdargs[0]
+            value  = args.pop(0) if args else MISSING
+            if value == '--':
+                error_flags = False
+                continue
+
+            value = self.validate_arg(ctx, cmdarg, value, error_flags)
+            if cmdarg.repeat:
+                value = value if isinstance(value, (list, tuple, set)) else [value]
+                values.setdefault(cmdarg.name, [])
+                values[cmdarg.name].extend(value)
+            else:
+                values[cmdarg.name] = value
+                cmdargs.pop(0)
+
+        remaining = []
+        for arg in cmdargs:
+            if arg.name in values:
+                continue
+            if arg.default is not None:
+                values[arg.name] = arg.default
+                continue
+            remaining.append(arg)
+
+        ctx.add_missing(*remaining)
+        ctx.add_unexpected(*args)
+        return values
+
+    def split_flags(self, ctx: Context,
+        flags: List[Flag], args: List[str]) -> Dict[str, Any]:
+        """
+        """
+        indexes = index_flags(flags, args)
+
+        values: Dict[str, List[Optional[str]]] = {}
+        indexes.reverse()
+        for idx, flag in indexes:
+            ctx.splice_args(args, idx, 1)
+            has_value = not any(i == idx + 1 for i, _ in indexes) \
+                and idx + 1 <= len(args) and flag._requires_value()
+            value = ctx.splice_args(args, idx, 1)[0] if has_value else None
+            values.setdefault(flag.name, [])
+            values[flag.name].append(value)
+
+        parsed = {}
+        for flag in flags:
+            fvalue = values.get(flag.name, MISSING)
+            parsed[flag.name] = self.validate_flag(ctx, flag, fvalue)
+        return parsed
+
+    def split_commands(self, ctx: Context,
+        commands: List[Command], args: List[str]) -> Dict[str, ParsedCmd]:
+        """
+        """
+        indexes = index_commands(commands, args)
+
+        parsed = {}
+        indexes.reverse()
+        for idx, command in indexes:
+            c_ctx      = ctx.stack(command)
+            c_args     = c_ctx.splice_args(args, idx)[1:]
+            c_commands = self.split_commands(c_ctx, command.commands, c_args)
+            c_flags    = self.split_flags(c_ctx, command.flags, c_args)
+            c_params   = self.split_args(c_ctx, command.args, c_args)
+            c_ctx.finalize()
+            parsed[command.name] = ParsedCmd(command,
+                c_params, c_commands, c_flags)
+
+        if not parsed and ctx.command.subcommand_required:
+            ctx.add_missing(ctx.command)
+        return parsed
+
+    def parse(self, args: List[str]) -> ParsedCmd:
+        """
+        """
+        args     = args.copy()
+        ctx      = Context([self.command])
+        commands = self.split_commands(ctx, self.command.commands, args)
+        flags    = self.split_flags(ctx, self.command.flags, args)
+        params   = self.split_args(ctx, self.command.args, args)
+        ctx.finalize()
+        return ParsedCmd(self.command, params, commands, flags)
