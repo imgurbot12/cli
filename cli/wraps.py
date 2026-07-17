@@ -1,17 +1,28 @@
 """
 CLI Action Argument Construction Wrappers
 """
+import asyncio
 import inspect
 import functools
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Type, TypeVar
 
-from . import Context
+from .arg import Arg
+from .flag import Flag
+from .cmd import Action, AsyncAction, Command
+from .context import Context
 
 #** Variables **#
 
 R = TypeVar('R')
 
+#: hidden attribute tied to context wrapper
+WRAP_CTX_ATTR = '__cli_wrapped_ctx'
+
 #** Classes **#
+
+class Doc(NamedTuple):
+    about:  str
+    params: Dict[str, str]
 
 class Inspected(NamedTuple):
     args:      List[str]
@@ -22,6 +33,21 @@ class Inspected(NamedTuple):
     typehints: Dict[str, Type]
 
 #** Functions **#
+
+def wrap_async(action: Action) -> AsyncAction:
+    """
+    convert action into async-action
+
+    :param action: action callback
+    :return:       async action callback
+    """
+    if inspect.iscoroutinefunction(action):
+        return action
+
+    @functools.wraps(action)
+    async def inner(*args, **kwargs):
+        await asyncio.to_thread(action, *args, **kwargs)
+    return inner
 
 @functools.lru_cache(maxsize=None)
 def get_signature(callable: Callable) -> Inspected:
@@ -51,13 +77,87 @@ def get_signature(callable: Callable) -> Inspected:
                 typehints[p.name] = type(p.default)
     return Inspected(args, kwargs, arg_splat, kw_splat, defaults, typehints)
 
-def wraps(callable: Callable[..., R]) -> Callable[[Context], R]:
+@functools.lru_cache(maxsize=None)
+def parse_doc(callable: Callable):
     """
     """
-    if hasattr(callable, '__cli_wrapped'):
-        return callable
+    doc   = callable.__doc__ or ''
+    about = []
+    strip = '@:<{}[]- \t\r'
+    descriptions = {}
+    for line in doc.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        if not line.startswith(':'):
+            about.append(line)
+            continue
+
+        details = line.strip('@:').strip().split(' ', 2)
+        if details[0].lower() != 'param':
+            continue
+
+        table        = any(details[1].startswith(c) for c in '{<[:')
+        param, usage = details[2].split(' ', 1) if table else tuple(details[1:])
+        descriptions[param.strip(strip)] = usage.strip(strip)
+    return Doc(' '.join(about), descriptions)
+
+def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
+    """
+    convert function into a command definition using function doc/signature
+
+    :param callable: function to convert to a command
+    :param cls:      command class factory
+    :return:         command generated from function
+    """
+    doc       = parse_doc(callable)
     signature = get_signature(callable)
-    def inner(ctx: Context):
+    args      = []
+    flags     = []
+    for arg in signature.args:
+        typedef = signature.typehints.get(arg, str)
+        args.append(Arg[typedef](
+            name=arg,
+            about=doc.params.get(arg, None),
+            default=signature.defaults.get(arg, None),
+        ))
+    for flag in signature.kwargs:
+        typedef = signature.typehints.get(flag, str)
+        flags.append(Flag[typedef](
+            name=flag,
+            about=doc.params.get(flag, None),
+            default=signature.defaults.get(flag, None),
+            required=flag not in signature.defaults,
+        ))
+    if signature.arg_splat is not None:
+        typedef = signature.typehints.get(signature.arg_splat, str)
+        args.append(Arg[typedef](
+            name=signature.arg_splat,
+            about=doc.params.get(signature.arg_splat, None),
+            repeat=True,
+            required=False,
+        ))
+    return cls(
+        name=callable.__name__,
+        about=doc.about,
+        args=args,
+        flags=flags,
+        action=callable,
+    )
+
+def wrap_ctx(callable: Callable[..., R]) -> Callable[[Context], R]:
+    """
+    wrap function in handler that unwraps the context into its relevant args
+
+    :param callable: original function to wrap
+    :return:         wrapped function
+    """
+    if hasattr(callable, WRAP_CTX_ATTR):
+        return callable
+
+    signature = get_signature(callable)
+    def inner(ctx: Context) -> R:
         used = set()
         args = []
         for arg in signature.args:
@@ -94,5 +194,5 @@ def wraps(callable: Callable[..., R]) -> Callable[[Context], R]:
                     kwargs[key] = value
         return callable(*args, **kwargs)
 
-    setattr(inner, '__cli_wrapped', True)
+    setattr(inner, WRAP_CTX_ATTR, True)
     return inner

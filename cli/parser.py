@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-from . import MISSING, T
+from . import T
 from .arg import Arg
-from .command import Command
+from .cmd import Command
 from .flag import Flag
+from .context import MISSING
 
 #** Variables **#
 __all__ = ['Parser', 'ParsedCmd']
@@ -59,7 +60,7 @@ class ParsedCmd:
     commands: Dict[str, 'ParsedCmd']
     flags:    Dict[str, Any]
 
-class Context:
+class ParseCtx:
     """
     """
     __slots__ = ('path', 'missing', 'unexpected')
@@ -83,7 +84,7 @@ class Context:
         """
         return self.path[-1]
 
-    def stack(self, command: Command) -> 'Context':
+    def stack(self, command: Command) -> 'ParseCtx':
         """
         """
         return self.__class__([*self.path, command])
@@ -120,22 +121,22 @@ class Context:
 
 class ParseError(Exception):
 
-    def __init__(self, ctx: Context, *args):
+    def __init__(self, ctx: ParseCtx, *args):
         super().__init__(ctx, *args)
         self.ctx = ctx
 
 class CommandRequired(ParseError):
-    def __init__(self, ctx: Context, commands: List[Command]):
+    def __init__(self, ctx: ParseCtx, commands: List[Command]):
         super().__init__(ctx, commands)
         self.commands = commands
 
 class Missing(ParseError):
-    def __init__(self, ctx: Context, missing: List[Union[Arg, Flag]]):
+    def __init__(self, ctx: ParseCtx, missing: List[Union[Arg, Flag]]):
         super().__init__(ctx, missing)
         self.missing = missing
 
 class Unexpected(ParseError):
-    def __init__(self, ctx: Context, unexpected: List[str]):
+    def __init__(self, ctx: ParseCtx, unexpected: List[str]):
         super().__init__(ctx, unexpected)
         self.unexpected = unexpected
 
@@ -149,7 +150,7 @@ class Parser:
         self.command.validate()
 
     def validate_arg(self,
-        ctx: Context, arg: Arg, value: ArgValue, error_flags: bool) -> Any:
+        ctx: ParseCtx, arg: Arg, value: ArgValue, error_flags: bool) -> Any:
         """
         """
         if value is MISSING:
@@ -162,7 +163,7 @@ class Parser:
             value = validator(value)
         return value
 
-    def validate_flag(self, ctx: Context, flag: Flag, values: FlagValues) -> Any:
+    def validate_flag(self, ctx: ParseCtx, flag: Flag, values: FlagValues) -> Any:
         """
         """
         if values is MISSING:
@@ -182,7 +183,7 @@ class Parser:
             parsed.append(value)
         return parsed if flag.repeat else parsed[0]
 
-    def split_args(self, ctx: Context,
+    def split_args(self, ctx: ParseCtx,
         cmdargs: List[Arg], args: List[str]) -> Dict[str, Any]:
         """
         """
@@ -212,13 +213,14 @@ class Parser:
             if arg.default is not None:
                 values[arg.name] = arg.default
                 continue
-            remaining.append(arg)
+            if arg.required:
+                remaining.append(arg)
 
         ctx.add_missing(*remaining)
         ctx.add_unexpected(*args)
         return values
 
-    def split_flags(self, ctx: Context,
+    def split_flags(self, ctx: ParseCtx,
         flags: List[Flag], args: List[str]) -> Dict[str, Any]:
         """
         """
@@ -240,7 +242,7 @@ class Parser:
             parsed[flag.name] = self.validate_flag(ctx, flag, fvalue)
         return parsed
 
-    def split_commands(self, ctx: Context,
+    def split_commands(self, ctx: ParseCtx,
         commands: List[Command], args: List[str]) -> Dict[str, ParsedCmd]:
         """
         """
@@ -266,7 +268,7 @@ class Parser:
         """
         """
         args     = args.copy()
-        ctx      = Context([self.command])
+        ctx      = ParseCtx([self.command])
         commands = self.split_commands(ctx, self.command.commands, args)
         flags    = self.split_flags(ctx, self.command.flags, args)
         params   = self.split_args(ctx, self.command.args, args)

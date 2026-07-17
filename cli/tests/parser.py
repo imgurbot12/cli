@@ -2,21 +2,15 @@
 CLI Parser UnitTests
 """
 from pathlib import Path
-from typing import List
+from typing import Iterable, List, Tuple, cast
 from unittest import TestCase
 
 from ._apps import APP_V1
 from .. import Arg, Command, Parser, ParsedCmd
-from ..parser import Context, CommandRequired, Missing, Unexpected
+from ..parser import ParseCtx, CommandRequired, Missing, Unexpected
 
 #** Variables **#
 __all__ = ['ParserTests']
-
-#DONE: support repeated arguments
-
-#TODO: parser should include quote/text strings
-#TODO: when validating arg values - check if might actually be a flag
-#      (allow if string is quote vs error if text)
 
 #** Classes **#
 
@@ -28,84 +22,86 @@ class ParserTests(TestCase):
         """
         return Parser(self.app).parse(args)
 
-    def assertPath(self, ctx: Context, path: List[str]):
+    def assertPath(self, ctx: ParseCtx, path: List[str]):
         """
         """
         expected = [c.name for c in ctx.path]
         self.assertListEqual(expected, path)
 
+    def assertUnexpected(self,
+        args: List[str], path: List[str], unexpected: List[str]):
+        """
+        """
+        error = None
+        try:
+            self.parse(args)
+            self.assertFalse(True)
+        except Unexpected as e:
+            error = e
+        self.assertIsNotNone(error)
+        error = cast(Unexpected, error)
+        self.assertPath(error.ctx, [self.app.name, *path])
+        self.assertListEqual(error.unexpected, unexpected)
+
+    def assertUnexpectedMulti(self,
+        tests: Iterable[Tuple[List[str], List[str], List[str]]]):
+        """
+        """
+        for args, path, unexpected in tests:
+            with self.subTest(args):
+                self.assertUnexpected(args, path, unexpected)
+
     def test_flag_not_defined(self):
         """
         ensure error is raised on undefined-flags
         """
-        tests = [
+        self.assertUnexpectedMulti([
             (['echo', '-a'], ['echo'], ['-a']),
             (['-a'], [], ['-a']),
             (['do', 'run', '1', '-a'], ['do', 'run'], ['-a']),
-        ]
-        for args, path, unexpected in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Unexpected as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertListEqual(e.unexpected, unexpected)
+        ])
 
     def test_flag_invalid(self):
         """
         ensure error invalid flag location
         """
-        tests = [
+        self.assertUnexpectedMulti([
             (['-f', 'echo', 'test'], [], ['-f']),
             (['echo', 'test', '-l'], ['echo'], ['-l']),
             (['echo', 'test', '-u'], ['echo'], ['-u']),
-        ]
-        for args, path, unexpected in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Unexpected as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertListEqual(e.unexpected, unexpected)
+        ])
+
+    #TODO: arg/flag with `repeat` enabled tests
 
     def test_flag_double(self):
         """
         ensure error when flag is defined and used twice
         """
-        tests = [
+        self.assertUnexpectedMulti([
             (['-u', 'a', '-u', 'b'], [], ['-u', 'b']),
             (['-d', '-d'], [], ['-d']),
             (['-d', '--debug'], [], ['--debug']),
             (['--debug', '-d'], [], ['-d']),
             (['echo', 'test', '-f', 'a', '-f', 'b'], ['echo'], ['-f']),
-        ]
-        for args, path, unexpected in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Unexpected as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertListEqual(e.unexpected, unexpected)
+        ])
 
     def test_invalid_command(self):
         """
         ensure error is raised with invalid command/argument
         """
-        tests = [
+        self.assertUnexpectedMulti([
             (['badcmd'], [], ['badcmd']),
             (['do', 'badcmd'], ['do'], ['badcmd']),
-        ]
-        for args, path, unexpected in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Unexpected as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertListEqual(e.unexpected, unexpected)
+        ])
+
+    def test_argument_extra(self):
+        """
+        ensure error is raised when too many arguments are present
+        """
+        self.assertUnexpectedMulti([
+            (['do', 'run', '1', '2', '3'], ['do', 'run'], ['3']),
+            (['do', 'fly', '4', '5'], ['do', 'fly'], ['5']),
+        ])
 
     def test_command_missing(self):
         """
@@ -139,56 +135,62 @@ class ParserTests(TestCase):
                         self.assertEqual(actual.__class__, expect.__class__)
                         self.assertEqual(actual.name, expect.name)
 
-    def test_argument_extra(self):
-        """
-        ensure error is raised when too many arguments are present
-        """
-        tests = [
-            (['do', 'run', '1', '2', '3'], ['do', 'run'], ['3']),
-            (['do', 'fly', '4', '5'], ['do', 'fly'], ['5']),
-        ]
-        for args, path, unexpected in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Unexpected as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertListEqual(e.unexpected, unexpected)
+    #TODO: better exceptions/tests for invalid data-types for args/flags
 
-    def test_valid_command(self):
+    def test_simple(self):
         """
-        ensure valid commands work as intended
+        ensure simple single-command parse works as intended
         """
-        app_opts = {'user': 'root', 'log': 10, 'debug': False}
-        result = self.parse(['-d'])
+        opts   = {'user': 'root', 'log': 10, 'debug': False}
+        result = self.parse([])
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, {**app_opts, 'debug': True})
+        self.assertDictEqual(result.flags, opts)
         self.assertDictEqual(result.commands, {})
 
+        result = self.parse(['-d'])
+        self.assertDictEqual(result.args, {})
+        self.assertDictEqual(result.flags, {**opts, 'debug': True})
+        self.assertDictEqual(result.commands, {})
+
+        for value in ('info', '20'):
+            with self.subTest(value):
+                result = self.parse(['-l', value])
+                self.assertDictEqual(result.args, {})
+                self.assertDictEqual(result.flags, {**opts, 'log': 20})
+                self.assertDictEqual(result.commands, {})
+
+    def test_sub_command(self):
+        """
+        ensure single sub-command parse works as intended
+        """
+        opts   = {'user': 'root', 'log': 10, 'debug': False}
         result = self.parse(['echo', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, app_opts)
+        self.assertDictEqual(result.flags, opts)
+        self.assertEqual(len(result.commands), 1)
         self.assertDictEqual(echo.flags, {'dry': True, 'file': Path('file')})
 
         result = self.parse(['echo', '--', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, app_opts)
+        self.assertDictEqual(result.flags, opts)
+        self.assertEqual(len(result.commands), 1)
         self.assertDictEqual(echo.args, {'test': ['-d', '-f', 'file', 'test']})
         self.assertDictEqual(echo.flags, {'dry': False, 'file': None})
 
-        args = [
-            ['do', 'run', '--', '5'],
-            ['do', 'run', '5'],
-        ]
+    def test_subsub_command(self):
+        """
+        ensure double sub-command parse works as intended
+        """
+        opts = {'user': 'root', 'log': 10, 'debug': False}
+        args = (['do', 'run', '--', '5'], ['do', 'run', '5'])
         for args in args:
             with self.subTest(args):
                 result = self.parse(args)
                 do     = result.commands['do']
                 self.assertDictEqual(result.args, {})
-                self.assertDictEqual(result.flags, app_opts)
+                self.assertDictEqual(result.flags, opts)
                 self.assertDictEqual(do.args, {})
                 self.assertDictEqual(do.flags, {'kill': False})
                 self.assertDictEqual(do.commands['run'].args, {'dist1': 5, 'dist2': 1})

@@ -2,22 +2,26 @@
 CLI Command Implementation
 """
 import sys
-from typing import Callable, Dict, List, Optional, Type
+from typing import Awaitable, BinaryIO, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
 
-from . import Context
 from .arg import Args
 from .flag import Flags
-from .wraps import wraps
 
 #** Variables **#
 __all__ = ['Action', 'Command', 'Commands']
 
-Action   = Callable[..., None]
-Commands = List['Command']
+C           = TypeVar('C', bound='Command')
+Commands    = List['Command']
+
+SyncAction  = Callable[..., None]
+AsyncAction = Callable[..., Awaitable[None]]
+Action      = Union[SyncAction, AsyncAction]
 
 #** Classes **#
 
 class Command:
+    """
+    """
     __slots__ = (
         'name', 'about', 'version', 'authors', 'category', 'hidden',
         'args', 'flags', 'commands', 'aliases', 'subcommand_required',
@@ -54,6 +58,14 @@ class Command:
 
     def __repr__(self) -> str:
         return f'Command(name={self.name}, aliases={self.aliases!r})'
+
+    def __call__(self,
+        args:   Optional[List[str]]      = None,
+        parser: Optional[Type['Parser']] = None,
+        stdout: Optional['AnyIO']        = None,
+        stderr: Optional['AnyIO']        = None,
+    ):
+        return self.run(args, parser, stdout, stderr)
 
     @property
     def categories(self) -> Dict[str, List['Command']]:
@@ -93,6 +105,50 @@ class Command:
         retrieve category names
         """
         return [category for category in self.categories.keys()]
+
+    @overload
+    def command(self,
+        name:     Optional[str] = None,
+        about:    Optional[str] = None,
+        category: Optional[str] = None,
+        hidden:   bool          = False,
+        cls:      None          = None,
+    ) -> Callable[[Callable], Command]:
+        ...
+
+    @overload
+    def command(self,
+        name:     Optional[str] = None,
+        about:    Optional[str] = None,
+        category: Optional[str] = None,
+        hidden:   bool          = False,
+        cls:      Type[C]     = ...,
+    ) -> Callable[[Callable], C]:
+        ...
+
+    @overload
+    def command(self, name: Callable) -> 'Command':
+        ...
+
+    def command(self,
+        name:     Union[str, Action, None] = None,
+        about:    Optional[str]            = None,
+        category: Optional[str]            = None,
+        hidden:   bool                     = False,
+        cls:      Optional[Type[C]]        = None,
+    ) -> Union[Callable[[Action], 'Command'], C, Command]:
+        """
+        """
+        cname = name if isinstance(name, str) else None
+        def wrapper(action: Action) -> Command:
+            cmd = into_command(action, cls or Command)
+            cmd.name     = cname or cmd.name
+            cmd.about    = about or cmd.about
+            cmd.category = category or cmd.category
+            cmd.hidden   = hidden or cmd.hidden
+            self.commands.append(cmd)
+            return cmd
+        return wrapper(name) if callable(name) else wrapper
 
     def _validate_args(self):
         """
@@ -157,28 +213,56 @@ class Command:
         engine = (parser or Parser)(self)
         return engine.parse(args or sys.argv[1:])
 
-    #TODO: limit call to last in chain (unless explicitlly allowed)
-    def run_with(self, context: Context, action: Optional[Action] = None):
+    def run_with(self, context: Context, action: Optional[SyncAction] = None):
         """
         """
-        action = action or self.action
-        if action is not None:
-            if not context.parsed.commands or not self.subcommand_required:
-                func = wraps(action)
+        act = action or self.action
+        if act is not None:
+            if not self.subcommand_required or not context.parsed.commands:
+                func = wrap_ctx(act)
                 func(context)
         for parsed in context.parsed.commands.values():
             context = context.stack(parsed)
             context.command.run_with(context)
 
+    async def run_with_async(self,
+        context: Context, action: Optional[AsyncAction] = None):
+        """
+        """
+        act = action or self.action
+        if act is not None:
+            if not self.subcommand_required or not context.parsed.commands:
+                async_act = wrap_async(act)
+                await wrap_ctx(async_act)(context)
+        for parsed in context.parsed.commands.values():
+            context = context.stack(parsed)
+            await context.command.run_with_async(context)
+
     def run(self,
         args:   Optional[List[str]]      = None,
         parser: Optional[Type['Parser']] = None,
+        stdout: Optional['AnyIO']        = None,
+        stderr: Optional['AnyIO']        = None,
     ):
         """
         """
         result  = self.parse(args, parser)
-        context = Context(result)
-        self.run_with(context)
+        with new_context(result, stdout=stdout, stderr=stderr) as context:
+            self.run_with(context)
+
+    async def run_async(self,
+        args:   Optional[List[str]]      = None,
+        parser: Optional[Type['Parser']] = None,
+        stdout: Optional['AnyIO']        = None,
+        stderr: Optional['AnyIO']        = None,
+    ):
+        """
+        """
+        result = self.parse(args, parser)
+        with new_context(result, stdout=stdout, stderr=stderr) as context:
+            await self.run_with_async(context)
 
 #** Imports **#
+from .context import AnyIO, Context, new_context
+from .wraps import into_command, wrap_ctx, wrap_async
 from .parser import Parser, ParsedCmd

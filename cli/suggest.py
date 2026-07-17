@@ -4,7 +4,7 @@ CLI Autocomplete Suggestion Implementation
 from typing import Iterator, List, Optional, Union
 
 from .arg import Arg
-from .command import Command
+from .cmd import Command
 from .flag import Flag
 from .parser import index_commands, index_flags
 
@@ -116,7 +116,7 @@ class Suggestor:
             return self.suggest_options(options, value)
 
         options = [c.name for c in command.visible_commands()]
-        if command.subcmd_required:
+        if command.subcommand_required:
             return self.suggest_options(options, value)
 
         options += [v for flag in flags for v in flag.variants()]

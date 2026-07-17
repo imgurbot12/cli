@@ -3,27 +3,31 @@ Command-Line-Interface Parsing Library
 """
 from enum import Enum
 from typing import (
-    Annotated, Any, Callable, Dict, Iterable, List, Optional, Type, TypeVar,
-    cast, get_args, get_origin, get_type_hints)
+    Annotated, Callable, Iterable, List, Optional, Type, TypeVar, Union,
+    cast, get_args, get_origin, get_type_hints, overload)
 
-#TODO: assume anything with `-` before `--` is a flag and parse it as such
-#TODO:   include tip on unexpected when flag could potentially act as an argument
+#TODO: functions:  cli.group/cli.context/cli.echo
+#TODO: decorators: cli.argument/cli.flag to override/enhance parsed details
+#TODO: handle ValueError exceptions on data-type issues
 #TODO: errors should be more precisce -> double flag, extra arg, etc...
-#TODO: anything after -- is just an argument
-#        include tip on unexpected when arg could be flag/command
+#TODO: docstrings for all functions
 
 #** Variables **#
 __all__ = [
+    'echo',
+    'command',
+    'get_current_context',
+
     'App',
     'Arg',
     'Args',
     'Command',
+    'Context',
     'Flag',
 
     'Parser',
     'ParsedCmd',
     'Suggestor',
-
     'SuggestFunc',
 ]
 
@@ -31,7 +35,58 @@ E           = TypeVar('E', bound=Enum)
 T           = TypeVar('T')
 SuggestFunc = Callable[[str], Iterable[str]]
 
+#TODO: use context-vars to pass around context!!
+
 #** Functions **#
+
+@overload
+def command(
+    name:     Optional[str]       = None,
+    about:    Optional[str]       = None,
+    category: Optional[str]       = None,
+    hidden:   bool                = False,
+    cls:      None                = None,
+) -> Callable[[Callable], Command]:
+    ...
+
+@overload
+def command(
+    name:     Optional[str] = None,
+    about:    Optional[str] = None,
+    category: Optional[str] = None,
+    hidden:   bool          = False,
+    cls:      Type['C']     = ...,
+) -> Callable[[Callable], 'C']:
+    ...
+
+@overload
+def command(name: Callable) -> 'Command':
+    ...
+
+def command(
+    name:     Union[str, 'Action', None] = None,
+    about:    Optional[str]              = None,
+    category: Optional[str]              = None,
+    hidden:   bool                       = False,
+    cls:      Optional[Type['C']]        = None,
+) -> Union[Callable[['Action'], 'Command'], 'C', 'Command']:
+    """
+    Generate a new `Command` and uses the new decorated function as its action.
+
+    :param name:     name of the command
+    :param about:    command about description
+    :param category: command category
+    :param hidden:   hidden status of command
+    """
+    cname = name if isinstance(name, str) else None
+    def wrapper(action: Action) -> Command:
+        cmd          = into_command(action, cls or Command)
+        cmd.name     = cname or cmd.name
+        cmd.about    = about or cmd.about
+        cmd.category = category or cmd.category
+        cmd.hidden   = hidden or cmd.hidden
+        return cmd
+    return wrapper(name) if callable(name) else wrapper
 
 def get_type(self, ftype: Optional[Type[T]]) -> Type[T]:
     """
@@ -68,78 +123,15 @@ def get_validator(type: Type,
 
 #** Classes **#
 
-class MISSING:
-    pass
-
-class Context:
-    """
-    """
-    parsed:  'ParsedCmd'
-    command: Command
-    parent:  Optional['Context']
-    args:    Dict[str, Any]
-    flags:   Dict[str, Any]
-    extra:   Dict[str, Any]
-
-    def __init__(self, parsed: 'ParsedCmd', parent: Optional['Context'] = None):
-        self.parsed  = parsed
-        self.command = parsed.source
-        self.args    = parsed.args
-        self.flags   = parsed.flags
-        self.parent  = parent
-        self.extra   = parent.extra if parent else {}
-
-    def _get(self, dict: Dict[str, Any], name: str, cast: Optional[Type[T]]) -> T:
-        """
-        """
-        value = dict[name]
-        if cast is not None and not isinstance(value, cast):
-            t1 = type(value).__name__
-            t2 = cast.__name__
-            raise TypeError(f'{name!r} ({t1}) is not a {t2}')
-        return value
-
-    def get(self, name: str,
-        cast: Optional[Type[T]] = None, default: Any = MISSING) -> T:
-        """
-        """
-        value = self.args.get(name, MISSING)
-        value = self.flags.get(name, MISSING) if value is MISSING else value
-        value = self.extra.get(name, MISSING) if value is MISSING else value
-        value = default if value is MISSING else value
-        if value is MISSING:
-            raise KeyError(name)
-        if cast is not None and not isinstance(value, cast):
-            t1 = type(value).__name__
-            t2 = cast.__name__
-            raise TypeError(f'{name!r} ({t1}) is not a {t2}')
-        return value
-
-    def get_arg(self, name: str, cast: Optional[Type[T]] = None) -> T:
-        """
-        """
-        return self._get(self.args, name, cast)
-
-    def get_flag(self, name: str, cast: Type[T]) -> T:
-        """
-        """
-        return self._get(self.flags, name, cast)
-
-    def get_extra(self, name: str, cast: Type[T]) -> T:
-        """
-        """
-        return self._get(self.extra, name, cast)
-
-    def stack(self, parsed: 'ParsedCmd') -> 'Context':
-        """
-        """
-        return self.__class__(parsed, parent=self)
 
 #** Imports **#
 from .app import App
 from .arg import Arg, Args
-from .command import Command
+from .cmd import C, Action, Command
+from .context import Context, get_current_context
 from .flag import Flag
 from .parser import Parser, ParsedCmd
 from .suggest import Suggestor
+from .utils import echo
 from .validate import DEFAULT_VALIDATORS, Validator, ValidatorFunc
+from .wraps import into_command
