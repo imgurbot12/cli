@@ -4,7 +4,7 @@ CLI Action Context
 import sys
 from contextvars import ContextVar
 from contextlib import contextmanager
-from typing import Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO, Type, Union, overload
+from typing import Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO, Type, Union, cast, overload
 
 from . import T
 
@@ -74,18 +74,23 @@ class Context:
         self.stdout  = stdout or sys.stdout
         self.stderr  = stderr or sys.stderr
 
-    def _get(self, dict: Dict[str, Any], name: str, cast: Optional[Type[T]]) -> T:
+    def __repr__(self) -> str:
+        """
+        """
+        return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
+
+    def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
         """
         """
         value = dict[name]
-        if cast is not None and not isinstance(value, cast):
+        if ctype is not None and not isinstance(value, ctype):
             t1 = type(value).__name__
-            t2 = cast.__name__
+            t2 = ctype.__name__
             raise TypeError(f'{name!r} ({t1}) is not a {t2}')
         return value
 
     def get(self, name: str,
-        cast: Optional[Type[T]] = None, default: Any = MISSING) -> T:
+        ctype: Optional[Type[T]] = None, default: Any = MISSING) -> T:
         """
         """
         value = self.args.get(name, MISSING)
@@ -93,27 +98,29 @@ class Context:
         value = self.extra.get(name, MISSING) if value is MISSING else value
         value = default if value is MISSING else value
         if value is MISSING:
+            if ctype is not None and issubclass(ctype, self.__class__):
+                return cast(T, self)
             raise KeyError(name)
-        if cast is not None and not isinstance(value, cast):
+        if ctype is not None and not isinstance(value, ctype):
             t1 = type(value).__name__
-            t2 = cast.__name__
+            t2 = ctype.__name__
             raise TypeError(f'{name!r} ({t1}) is not a {t2}')
         return value
 
-    def get_arg(self, name: str, cast: Optional[Type[T]] = None) -> T:
+    def get_arg(self, name: str, ctype: Optional[Type[T]] = None) -> T:
         """
         """
-        return self._get(self.args, name, cast)
+        return self._get(self.args, name, ctype)
 
-    def get_flag(self, name: str, cast: Type[T]) -> T:
+    def get_flag(self, name: str, ctype: Type[T]) -> T:
         """
         """
-        return self._get(self.flags, name, cast)
+        return self._get(self.flags, name, ctype)
 
-    def get_extra(self, name: str, cast: Type[T]) -> T:
+    def get_extra(self, name: str, ctype: Type[T]) -> T:
         """
         """
-        return self._get(self.extra, name, cast)
+        return self._get(self.extra, name, ctype)
 
     def stack(self, parsed: 'ParsedCmd') -> 'Context':
         """

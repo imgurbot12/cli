@@ -2,12 +2,12 @@
 CLI Parser UnitTests
 """
 from pathlib import Path
-from typing import Iterable, List, Tuple, cast
+from typing import Iterable, List, Tuple, Type, Union, cast
 from unittest import TestCase
 
 from ._apps import APP_V1
-from .. import Arg, Command, Parser, ParsedCmd
-from ..parser import ParseCtx, CommandRequired, Missing, Unexpected
+from .. import Arg, Command, Flag, Parser, ParsedCmd
+from ..parser import Invalid, MissingValue, ParseCtx, CommandRequired, Missing, Unexpected
 
 #** Variables **#
 __all__ = ['ParserTests']
@@ -27,6 +27,64 @@ class ParserTests(TestCase):
         """
         expected = [c.name for c in ctx.path]
         self.assertListEqual(expected, path)
+
+    def assertMissing(self,
+        args:      List[str],
+        path:      List[str],
+        missing:   List[Union[Arg, Flag]],
+        exception: Union[Type[Missing], Type[MissingValue]] = Missing,
+    ):
+        """
+        """
+        error = None
+        try:
+            self.parse(args)
+            self.assertFalse(True)
+        except exception as e:
+            error = e
+        self.assertIsNotNone(error)
+        error = cast(Missing, error)
+        self.assertPath(error.ctx, [self.app.name, *path])
+        self.assertEqual(len(error.missing), len(missing))
+        for actual, expect in zip(error.missing, missing):
+            self.assertEqual(actual.__class__, expect.__class__)
+            self.assertEqual(actual.name, expect.name)
+
+    def assertMissingMulti(self,
+        tests:     Iterable[Tuple[List[str], List[str], List[Union[Arg, Flag]]]],
+        exception: Union[Type[Missing], Type[MissingValue]] = Missing,
+    ):
+        """
+        """
+        for args, path, unexpected in tests:
+            with self.subTest(args):
+                self.assertMissing(args, path, unexpected, exception)
+
+    def assertInvalid(self,
+        args: List[str], path: List[str], missing: List[Union[Arg, Flag]]):
+        """
+        """
+        error = None
+        try:
+            self.parse(args)
+            self.assertFalse(True)
+        except Invalid as e:
+            error = e
+        self.assertIsNotNone(error)
+        error = cast(Invalid, error)
+        self.assertPath(error.ctx, [self.app.name, *path])
+        self.assertEqual(len(error.invalid), len(missing))
+        for actual, expect in zip(error.invalid, missing):
+            self.assertEqual(actual.__class__, expect.__class__)
+            self.assertEqual(actual.name, expect.name)
+
+    def assertInvalidMulti(self,
+        tests: Iterable[Tuple[List[str], List[str], List[Union[Arg, Flag]]]]):
+        """
+        """
+        for args, path, unexpected in tests:
+            with self.subTest(args):
+                self.assertInvalid(args, path, unexpected)
 
     def assertUnexpected(self,
         args: List[str], path: List[str], unexpected: List[str]):
@@ -56,8 +114,8 @@ class ParserTests(TestCase):
         ensure error is raised on undefined-flags
         """
         self.assertUnexpectedMulti([
-            (['echo', '-a'], ['echo'], ['-a']),
             (['-a'], [], ['-a']),
+            (['echo', '-a'], ['echo'], ['-a']),
             (['do', 'run', '1', '-a'], ['do', 'run'], ['-a']),
         ])
 
@@ -71,27 +129,43 @@ class ParserTests(TestCase):
             (['echo', 'test', '-u'], ['echo'], ['-u']),
         ])
 
-    #TODO: arg/flag with `repeat` enabled tests
+    def test_flag_invalid_value(self):
+        """
+        ensure error on flag invalid value
+        """
+        self.assertInvalidMulti([
+            (['-l', 'a'], [], [Flag('log')]),
+            (['-l', 'a', '-r', '1', '-r', '2'], [], [Flag('log')]),
+            (['-l', 'a', '-r', '1', '-r', 'a'], [], [Flag('log'), Flag('repeat')]),
+        ])
 
-    def test_flag_double(self):
+    def test_flag_missing_value(self):
         """
-        ensure error when flag is defined and used twice
+        ensure error on flag missing value
         """
+        self.assertMissingMulti([
+            (['-u'], [], [Flag('user')]),
+            (['-l'], [], [Flag('log')]),
+            (['-r', '1', '-r'], [], [Flag('repeat')]),
+            (['-u', 'echo', 'test'], [], [Flag('user')]),
+            (['echo', 'test', '-f'], ['echo'], [Flag('file')]),
+        ], MissingValue)
+
+    def test_flag_repeat(self):
+        """
+        ensure repeated flags work as intended or error if not repeat
+        """
+        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': [1,2,3]}
+        result = self.parse(['-r', '1', '-r', '2', '-r', '3'])
+        self.assertDictEqual(result.args, {})
+        self.assertDictEqual(result.flags, opts)
+        self.assertDictEqual(result.commands, {})
         self.assertUnexpectedMulti([
             (['-u', 'a', '-u', 'b'], [], ['-u', 'b']),
             (['-d', '-d'], [], ['-d']),
             (['-d', '--debug'], [], ['--debug']),
             (['--debug', '-d'], [], ['-d']),
             (['echo', 'test', '-f', 'a', '-f', 'b'], ['echo'], ['-f']),
-        ])
-
-    def test_invalid_command(self):
-        """
-        ensure error is raised with invalid command/argument
-        """
-        self.assertUnexpectedMulti([
-            (['badcmd'], [], ['badcmd']),
-            (['do', 'badcmd'], ['do'], ['badcmd']),
         ])
 
     def test_argument_extra(self):
@@ -101,6 +175,36 @@ class ParserTests(TestCase):
         self.assertUnexpectedMulti([
             (['do', 'run', '1', '2', '3'], ['do', 'run'], ['3']),
             (['do', 'fly', '4', '5'], ['do', 'fly'], ['5']),
+        ])
+
+    def test_argument_missing(self):
+        """
+        ensure error is raised when arguments arent enough
+        """
+        self.assertMissingMulti([
+            (['echo'], ['echo'], [Arg('test')]),
+            (['do', 'run'], ['do', 'run'], [Arg('dist1')]),
+            (['do', 'fly'], ['do', 'fly'], [Arg('dist2')]),
+        ])
+
+    def test_argument_invalid(self):
+        """
+        ensure error is raised when arugment is invalid
+        """
+        self.assertInvalidMulti([
+            (['do', 'run', 'a'], ['do', 'run'], [Arg('dist1')]),
+            (['do', 'run', '1', 'b'], ['do', 'run'], [Arg('dist2')]),
+            (['do', 'run', 'a', 'b'], ['do', 'run'], [Arg('dist1'), Arg('dist2')]),
+            (['do', 'fly', 'a'], ['do', 'fly'], [Arg('dist2')])
+        ])
+
+    def test_command_invalid(self):
+        """
+        ensure error is raised with invalid command/argument
+        """
+        self.assertUnexpectedMulti([
+            (['badcmd'], [], ['badcmd']),
+            (['do', 'badcmd'], ['do'], ['badcmd']),
         ])
 
     def test_command_missing(self):
@@ -114,34 +218,11 @@ class ParserTests(TestCase):
             self.assertPath(e.ctx, [self.app.name, 'do'])
             self.assertListEqual([c.name for c in e.commands], ['run', 'fly'])
 
-    def test_argument_missing(self):
-        """
-        ensure error is raised when arguments arent enough
-        """
-        tests = [
-            (['echo'], ['echo'], [Arg('test')]),
-            (['do', 'run'], ['do', 'run'], [Arg('dist1')]),
-            (['do', 'fly'], ['do', 'fly'], [Arg('dist2')]),
-        ]
-        for args, path, missing in tests:
-            with self.subTest(args):
-                try:
-                    self.parse(args)
-                    self.assertFalse(True)
-                except Missing as e:
-                    self.assertPath(e.ctx, [self.app.name, *path])
-                    self.assertEqual(len(e.missing), len(missing))
-                    for actual, expect in zip(e.missing, missing):
-                        self.assertEqual(actual.__class__, expect.__class__)
-                        self.assertEqual(actual.name, expect.name)
-
-    #TODO: better exceptions/tests for invalid data-types for args/flags
-
     def test_simple(self):
         """
         ensure simple single-command parse works as intended
         """
-        opts   = {'user': 'root', 'log': 10, 'debug': False}
+        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         result = self.parse([])
         self.assertDictEqual(result.args, {})
         self.assertDictEqual(result.flags, opts)
@@ -163,7 +244,7 @@ class ParserTests(TestCase):
         """
         ensure single sub-command parse works as intended
         """
-        opts   = {'user': 'root', 'log': 10, 'debug': False}
+        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         result = self.parse(['echo', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
         self.assertDictEqual(result.args, {})
@@ -183,7 +264,7 @@ class ParserTests(TestCase):
         """
         ensure double sub-command parse works as intended
         """
-        opts = {'user': 'root', 'log': 10, 'debug': False}
+        opts = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         args = (['do', 'run', '--', '5'], ['do', 'run', '5'])
         for args in args:
             with self.subTest(args):
@@ -193,7 +274,7 @@ class ParserTests(TestCase):
                 self.assertDictEqual(result.flags, opts)
                 self.assertDictEqual(do.args, {})
                 self.assertDictEqual(do.flags, {'kill': False})
-                self.assertDictEqual(do.commands['run'].args, {'dist1': 5, 'dist2': 1})
+                self.assertDictEqual(do.commands['run'].args, {'dist1': 5, 'dist2': 42})
                 self.assertDictEqual(do.commands['run'].flags, {'km': False})
                 self.assertDictEqual(do.commands['run'].commands, {})
 

@@ -2,7 +2,9 @@
 CLI Command Implementation
 """
 import sys
-from typing import Awaitable, BinaryIO, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
+import inspect
+import asyncio
+from typing import Awaitable, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
 
 from .arg import Args
 from .flag import Flags
@@ -24,8 +26,8 @@ class Command:
     """
     __slots__ = (
         'name', 'about', 'version', 'authors', 'category', 'hidden',
-        'args', 'flags', 'commands', 'aliases', 'subcommand_required',
-        'action', )
+        'args', 'flags', 'commands', 'aliases', 'action',
+        'invoke_without_command',)
 
     def __init__(self,
         name:                   str,
@@ -39,22 +41,22 @@ class Command:
         commands:               Optional[Commands]  = None,
         aliases:                Optional[List[str]] = None,
         action:                 Optional[Action]    = None,
-        subcommand_required:    bool                = False,
+        invoke_without_command: bool                = False,
     ):
         """
         """
-        self.name                = name
-        self.about               = about
-        self.version             = version
-        self.authors             = authors
-        self.category            = category or '*'
-        self.hidden              = hidden
-        self.args                = args or []
-        self.flags               = flags or []
-        self.commands            = commands or []
-        self.aliases             = aliases or []
-        self.subcommand_required = subcommand_required
-        self.action              = action
+        self.name                   = name
+        self.about                  = about
+        self.version                = version
+        self.authors                = authors
+        self.category               = category or '*'
+        self.hidden                 = hidden
+        self.args                   = args or []
+        self.flags                  = flags or []
+        self.commands               = commands or []
+        self.aliases                = aliases or []
+        self.action                 = action
+        self.invoke_without_command = invoke_without_command
 
     def __repr__(self) -> str:
         return f'Command(name={self.name}, aliases={self.aliases!r})'
@@ -213,14 +215,25 @@ class Command:
         engine = (parser or Parser)(self)
         return engine.parse(args or sys.argv[1:])
 
+    def _check_run(self, context: Context) -> bool:
+        """
+        """
+        is_group = len(self.commands) > 0
+        if is_group:
+            return self.invoke_without_command \
+                or len(context.parsed.commands) > 0
+        return True
+
     def run_with(self, context: Context, action: Optional[SyncAction] = None):
         """
         """
         act = action or self.action
         if act is not None:
-            if not self.subcommand_required or not context.parsed.commands:
+            if self._check_run(context):
                 func = wrap_ctx(act)
-                func(context)
+                co   = func(context)
+                if inspect.isawaitable(co):
+                    asyncio.run(co)
         for parsed in context.parsed.commands.values():
             context = context.stack(parsed)
             context.command.run_with(context)
@@ -231,7 +244,7 @@ class Command:
         """
         act = action or self.action
         if act is not None:
-            if not self.subcommand_required or not context.parsed.commands:
+            if self._check_run(context):
                 async_act = wrap_async(act)
                 await wrap_ctx(async_act)(context)
         for parsed in context.parsed.commands.values():

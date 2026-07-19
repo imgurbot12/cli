@@ -4,6 +4,7 @@ Simple Application Command Description for UnitTesting
 import logging
 from pathlib import Path
 
+from . import User, Repeat
 from ... import Arg, Command, Flag
 from ...validate import LogLevel
 
@@ -15,10 +16,12 @@ APP_V1 = Command(
     about='example application v1',
     args=[],
     flags=[
-        Flag[str]('user, u', 'user to run application as', 'root'),
+        Flag[User]('user, u', 'user to run application as', 'root'),
         Flag[LogLevel]('log, l', 'specify loglevel for whole application', logging.DEBUG),
         Flag[bool]('debug, d', 'same as --log debug'),
+        Flag[Repeat]('repeat, r', 'repeatable flag', repeat=True),
     ],
+    invoke_without_command=True,
     commands=[
         Command(
             name='echo',
@@ -39,7 +42,7 @@ APP_V1 = Command(
                 Command(
                     name='run',
                     about='run a given number of miles',
-                    args=[Arg[int]('dist1'), Arg[int]('dist2', default=1)],
+                    args=[Arg[Repeat]('dist1'), Arg[int]('dist2', default=42)],
                     flags=[
                         Flag[bool]('km', 'use kilometers rather than miles')
                     ]
@@ -53,7 +56,6 @@ APP_V1 = Command(
                     ]
                 )
             ],
-            subcommand_required=True,
         )
-    ]
+    ],
 )

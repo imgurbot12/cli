@@ -63,15 +63,19 @@ class ParsedCmd:
 class ParseCtx:
     """
     """
-    __slots__ = ('path', 'missing', 'unexpected')
+    __slots__ = ('path', 'missing', 'missing_v', 'invalid', 'unexpected')
 
     path:       List[Command]
     missing:    List[Union[Arg, Flag, Command]]
+    missing_v:  List[Flag]
+    invalid:    Dict[Union[Arg, Flag], str]
     unexpected: List[str]
 
     def __init__(self, path: List[Command]):
         self.path       = path
         self.missing    = []
+        self.missing_v  = []
+        self.invalid    = {}
         self.unexpected = []
 
     def __repr__(self) -> str:
@@ -103,6 +107,16 @@ class ParseCtx:
         """
         self.missing.extend(missing)
 
+    def add_missing_value(self, *missing: Flag):
+        """
+        """
+        self.missing_v.extend(missing)
+
+    def add_invalid(self, invalid: Union[Arg, Flag], value: str):
+        """
+        """
+        self.invalid[invalid] = value
+
     def add_unexpected(self, *unexpected: str):
         """
         """
@@ -113,6 +127,10 @@ class ParseCtx:
         """
         if self.unexpected:
             raise Unexpected(self, self.unexpected)
+        if self.invalid:
+            raise Invalid(self, self.invalid)
+        if self.missing_v:
+            raise MissingValue(self, self.missing_v)
         if self.missing:
             command = [m for m in self.missing if isinstance(m, Command)]
             if command:
@@ -134,6 +152,16 @@ class Missing(ParseError):
     def __init__(self, ctx: ParseCtx, missing: List[Union[Arg, Flag]]):
         super().__init__(ctx, missing)
         self.missing = missing
+
+class MissingValue(ParseError):
+    def __init__(self, ctx: ParseCtx, missing: List[Flag]):
+        super().__init__(ctx, missing)
+        self.missing = missing
+
+class Invalid(ParseError):
+    def __init__(self, ctx: ParseCtx, invalid: Dict[Union[Arg, Flag], str]):
+        super().__init__(ctx, invalid)
+        self.invalid = invalid
 
 class Unexpected(ParseError):
     def __init__(self, ctx: ParseCtx, unexpected: List[str]):
@@ -160,7 +188,10 @@ class Parser:
             return ctx.add_unexpected(value)
 
         for validator in arg.validators:
-            value = validator(value)
+            try:
+                value = validator(value)
+            except ValueError as e:
+                return ctx.add_invalid(arg, e.args[0])
         return value
 
     def validate_flag(self, ctx: ParseCtx, flag: Flag, values: FlagValues) -> Any:
@@ -171,7 +202,7 @@ class Parser:
 
         values = cast(List[Optional[str]], values)
         if flag._requires_value() and any(v is None for v in values):
-            return ctx.add_missing(flag)
+            return ctx.add_missing_value(flag)
 
         parsed = []
         for value in values:
@@ -179,8 +210,11 @@ class Parser:
                 parsed.append(flag.default if flag._requires_value() else True)
                 continue
             for validator in flag.validators:
-                value = validator(value)
-            parsed.append(value)
+                try:
+                    value = validator(value)
+                except ValueError as e:
+                    return ctx.add_invalid(flag, e.args[0])
+            parsed.insert(0, value)
         return parsed if flag.repeat else parsed[0]
 
     def split_args(self, ctx: ParseCtx,
@@ -260,7 +294,8 @@ class Parser:
             parsed[command.name] = ParsedCmd(command,
                 c_params, c_commands, c_flags)
 
-        if not parsed and ctx.command.subcommand_required:
+        if not parsed and commands \
+            and not ctx.command.invoke_without_command:
             ctx.add_missing(ctx.command)
         return parsed
 

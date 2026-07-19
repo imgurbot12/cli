@@ -9,6 +9,8 @@ from datetime import timedelta
 from typing import Any, Callable, Optional, Union
 from typing_extensions import Annotated
 
+from .suggest import Suggest
+
 #** Variables **#
 __all__ = [
     'parse_bool',
@@ -17,7 +19,7 @@ __all__ = [
     'parse_loglevel',
     'parse_file',
 
-    'Validator',
+    'Validate',
     'ValidatorFunc',
 
     'Boolean',
@@ -30,6 +32,18 @@ __all__ = [
 ]
 
 ValidatorFunc = Callable[[Any], Any]
+
+#: valid logging levels
+LOG_LEVELS = {
+    'trace':    0,
+    'debug':    logging.DEBUG,
+    'info':     logging.INFO,
+    'warn':     logging.WARNING,
+    'warning':  logging.WARNING,
+    'error':    logging.ERROR,
+    'crit':     logging.CRITICAL,
+    'critical': logging.CRITICAL,
+}
 
 #: regex parser for duration string
 re_duration = re.compile(
@@ -88,7 +102,10 @@ def parse_loglevel(level: Union[str, int]) -> int:
     """
     level = int(level) if isinstance(level, str) and level.isdigit() else level
     if isinstance(level, str):
-        return getattr(logging, level.upper())
+        loglevel = LOG_LEVELS.get(level.lower(), None)
+        if loglevel is None:
+            raise ValueError(f'Invalid log-level: {level!r}')
+        return loglevel
     return level
 
 def parse_file(file: str, exists: Optional[bool] = None) -> Path:
@@ -109,7 +126,7 @@ def parse_file(file: str, exists: Optional[bool] = None) -> Path:
 
 #** Classes **#
 
-class Validator:
+class Validate:
     __slots__ = ('validator', )
 
     def __init__(self, validator: ValidatorFunc):
@@ -121,13 +138,13 @@ class Validator:
 
 #** Init **#
 
-Boolean      = Annotated[bool, Validator[parse_bool]]
-Float        = Annotated[float, Validator[parse_float]]
-Duration     = Annotated[timedelta, Validator[parse_duration]]
-LogLevel     = Annotated[int, Validator[parse_loglevel]]
-File         = Annotated[Path, Validator[parse_file]]
-NewFile      = Annotated[Path, Validator[lambda f: parse_file(f, False)]]
-ExistingFile = Annotated[Path, Validator[lambda f: parse_file(f, True)]]
+Boolean      = Annotated[bool, Validate[parse_bool]]
+Float        = Annotated[float, Validate[parse_float]]
+Duration     = Annotated[timedelta, Validate[parse_duration]]
+LogLevel     = Annotated[int, Validate[parse_loglevel], Suggest[LOG_LEVELS]]
+File         = Annotated[Path, Validate[parse_file]]
+NewFile      = Annotated[Path, Validate[lambda f: parse_file(f, False)]]
+ExistingFile = Annotated[Path, Validate[lambda f: parse_file(f, True)]]
 
 #: default validators for specific datatypes
 DEFAULT_VALIDATORS = {

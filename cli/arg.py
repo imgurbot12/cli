@@ -3,7 +3,7 @@ CLI Argument Implementation and DataType Parsers
 """
 from typing import Any, Callable, Generic, List, Optional, Type
 
-from . import T, SuggestFunc, get_type, get_validator
+from . import T, SuggestFunc, get_type, get_suggestor, get_validator
 
 #** Variables **#
 __all__ = ['Arg', 'Args']
@@ -33,8 +33,8 @@ class Arg(Generic[T]):
         self.required   = self.default is None if required is None else required
         self.repeat     = repeat
         self.validators = validators or []
-        self.suggestor  = suggestor
         self.type       = get_type(self, type)
+        self.suggestor  = suggestor or get_suggestor(self.type)
         self.validators = get_validator(self.type, self.validators)
 
     def __repr__(self) -> str:

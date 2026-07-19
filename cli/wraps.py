@@ -117,19 +117,21 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     flags     = []
     for arg in signature.args:
         typedef = signature.typehints.get(arg, str)
-        args.append(Arg[typedef](
-            name=arg,
-            about=doc.params.get(arg, None),
-            default=signature.defaults.get(arg, None),
-        ))
+        if not issubclass(typedef, Context):
+            args.append(Arg[typedef](
+                name=arg,
+                about=doc.params.get(arg, None),
+                default=signature.defaults.get(arg, None),
+            ))
     for flag in signature.kwargs:
         typedef = signature.typehints.get(flag, str)
-        flags.append(Flag[typedef](
-            name=flag,
-            about=doc.params.get(flag, None),
-            default=signature.defaults.get(flag, None),
-            required=flag not in signature.defaults,
-        ))
+        if not issubclass(typedef, Context):
+            flags.append(Flag[typedef](
+                name=flag,
+                about=doc.params.get(flag, None),
+                default=signature.defaults.get(flag, None),
+                required=flag not in signature.defaults,
+            ))
     if signature.arg_splat is not None:
         typedef = signature.typehints.get(signature.arg_splat, str)
         args.append(Arg[typedef](
