@@ -6,21 +6,21 @@ from typing import (
     Annotated, Callable, Iterable, List, Optional, Type, TypeVar,
     cast, get_args, get_origin, get_type_hints)
 
+#DONE: handle ValueError exceptions on data-type issues
 #TODO: functions:  cli.group/cli.context/cli.echo
 #TODO: decorators: cli.argument/cli.flag/cli.pass_context to override/enhance parsed details
-#TODO: handle ValueError exceptions on data-type issues
 #TODO: errors should be more precisce -> double flag, extra arg, etc...
 #TODO: docstrings for all functions
 
 #DONE: pass `Context` with annotation present or @cli.pass_context wrapper
-#TODO: moar unit-tests for parser
+#DONE: moar unit-tests for parser
 # - extra arg / missing arg / invalid arg / arg repeat
 # - extra flag / missing flag / invalid flag / missing flag value / invalid flag value / flag repeat
 # - repeated command
 # - group / command tree (subcmd-required difference)
 
+#DONE: suggestor unit-tests
 #TODO: help-page implementation (with colors)
-#TODO: suggestor unit-tests
 #TODO: give indexing another shot (but count down rather than up)
 
 #** Variables **#
@@ -30,9 +30,7 @@ __all__ = [
     'group',
     'get_current_context',
 
-    'App',
     'Arg',
-    'Args',
     'Command',
     'Context',
     'Flag',
@@ -94,8 +92,7 @@ def get_validator(type: Type,
     return validators
 
 #** Imports **#
-from .app import App
-from .arg import Arg, Args
+from .arg import Arg
 from .cmd import Command
 from .context import Context, get_current_context
 from .flag import Flag

@@ -10,8 +10,6 @@ from .. import Command, Suggestor
 #** Variables **#
 __all__ = ['SuggestTests']
 
-ALL_OPTS = ['echo', 'do', '-l', '--log', '-d', '--debug', '-r', '--repeat']
-
 #** Classes **#
 
 class SuggestTests(TestCase):

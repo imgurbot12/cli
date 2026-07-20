@@ -4,7 +4,7 @@ CLI Action Context
 import sys
 from contextvars import ContextVar
 from contextlib import contextmanager
-from typing import Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO, Type, Union, cast, overload
+from typing import Any, BinaryIO, Dict, Generator, List, Literal, Optional, Set, TextIO, Type, Union, cast, overload
 
 from . import T
 
@@ -78,6 +78,13 @@ class Context:
         """
         """
         return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
+
+    @property
+    def invoked_subcommands(self) -> Optional[List[str]]:
+        """
+        """
+        commands = list(self.parsed.commands.keys())
+        return commands if commands else None
 
     def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
         """

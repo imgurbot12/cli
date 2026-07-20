@@ -1,5 +1,6 @@
 """
 """
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
@@ -57,7 +58,7 @@ def index_commands(
 class ParsedCmd:
     source:   Command
     args:     Dict[str, Any]
-    commands: Dict[str, 'ParsedCmd']
+    commands: OrderedDict[str, 'ParsedCmd']
     flags:    Dict[str, Any]
 
 class ParseCtx:
@@ -282,7 +283,7 @@ class Parser:
         """
         indexes = index_commands(commands, args)
 
-        parsed = {}
+        parsed = []
         indexes.reverse()
         for idx, command in indexes:
             c_ctx      = ctx.stack(command)
@@ -291,13 +292,14 @@ class Parser:
             c_flags    = self.split_flags(c_ctx, command.flags, c_args)
             c_params   = self.split_args(c_ctx, command.args, c_args)
             c_ctx.finalize()
-            parsed[command.name] = ParsedCmd(command,
-                c_params, c_commands, c_flags)
+            parsed.append((command.name, ParsedCmd(command,
+                c_params, c_commands, c_flags)))
 
+        parsed.reverse()
         if not parsed and commands \
             and not ctx.command.invoke_without_command:
             ctx.add_missing(ctx.command)
-        return parsed
+        return OrderedDict(parsed)
 
     def parse(self, args: List[str]) -> ParsedCmd:
         """
