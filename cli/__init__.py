@@ -22,10 +22,13 @@ from typing import (
 #DONE: suggestor unit-tests
 #TODO: help-page implementation (with colors)
 #TODO: give indexing another shot (but count down rather than up)
+#TODO: controls on stripping/ignoring styling when writing to file instead of tty
 
 #** Variables **#
 __all__ = [
     'echo',
+    'style',
+    'secho',
     'command',
     'group',
     'get_current_context',
@@ -98,5 +101,5 @@ from .context import Context, get_current_context
 from .flag import Flag
 from .parser import Parser, ParsedCmd
 from .suggest import Suggest, Suggestor
-from .utils import echo, command, group
+from .utils import echo, style, secho, command, group
 from .validate import DEFAULT_VALIDATORS, Validate, ValidatorFunc

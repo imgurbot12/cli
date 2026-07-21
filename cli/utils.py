@@ -3,20 +3,45 @@ CLI Utility Functions
 """
 from io import TextIOBase
 from typing import (
-    Any, BinaryIO, Callable, Optional, TextIO, Type, Union, cast, overload)
+    Any, BinaryIO, Callable, Optional, TextIO, Type, TypedDict, Union, Unpack, cast, overload)
 
+from .ui import Color, Style, Styling, AnsiTermStyle
 from .cmd import C, Action, Command
-from .context import get_current_context
+from .context import AnyIO, get_current_context
 from .wraps import into_command
 
 #** Variables **#
-__all__ = ['echo', 'command', 'group']
+__all__ = ['echo', 'style', 'secho', 'command', 'group']
+
+#** Classes **#
+
+class StyleKwargs(TypedDict, total=False):
+    color:     Color
+    bold:      bool
+    dim:       bool
+    underline: bool
+    overline:  bool
+    italic:    bool
+    blink:     bool
+    reverse:   bool
+    strike:    bool
+    styling:   Styling
+    reset:     bool
 
 #** Functions **#
 
+def _get_file(
+    file: Optional[AnyIO], err: bool) -> AnyIO:
+    """
+    """
+    if file is not None:
+        return file
+    ctx = get_current_context()
+    return ctx.stderr if err else ctx.stdout
+
 def echo(
     *data: Any,
-    file:  Union[TextIO, BinaryIO, None] = None,
+    file:  Optional[AnyIO] = None,
     err:   bool = False,
     join:  str  = ' ',
     end:   str  = '\n'
@@ -30,12 +55,8 @@ def echo(
     :param join: substring to join elements of data
     :param end:  ending suffix for echo
     """
-    if file is None:
-        ctx  = get_current_context()
-        file = ctx.stderr if err else ctx.stdout
-
+    file      = _get_file(file, err)
     is_binary = not isinstance(file, TextIOBase)
-    file      = cast(Union[BinaryIO, TextIO], file)
 
     bin = []
     for arg in data:
@@ -53,6 +74,48 @@ def echo(
 
     file.write(j.join(bin) + e) #type: ignore
     file.flush()
+
+def style(text: Any, **kwargs: Unpack[StyleKwargs]) -> str:
+    """
+    """
+    text    = text if isinstance(text, str) else str(text)
+    styling = kwargs.pop('styling', None)
+    if styling is None:
+        ctx     = get_current_context(silent=True)
+        styling = ctx.styling if ctx is not None else AnsiTermStyle()
+
+    reset = kwargs.pop('reset', True)
+    color = kwargs.pop('color', None)
+    start = []
+    stop  = []
+    for style, apply in kwargs.items():
+        style = cast(Style, style)
+        apply = cast(bool, apply)
+        start.append(styling.toggle_style(style, apply))
+        if reset and apply is True:
+            stop.append(styling.reset_style(style))
+
+    text = text if color is None else styling.wrap_color(color, text)
+    start.append(text)
+    start.extend(stop)
+    return ''.join(start)
+
+def secho(
+    *data: Any,
+    file: Optional[AnyIO] = None,
+    err:  bool = False,
+    join: str  = ' ',
+    end:  str  = '\n',
+    **kwargs: Unpack[StyleKwargs],
+):
+    """
+    """
+    items = []
+    for item in data:
+        if not isinstance(item, (bytes, bytearray)):
+            item = style(item, **kwargs)
+        items.append(item)
+    return echo(*items, file=file, err=err, join=join, end=end)
 
 @overload
 def command(

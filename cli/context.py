@@ -4,9 +4,12 @@ CLI Action Context
 import sys
 from contextvars import ContextVar
 from contextlib import contextmanager
-from typing import Any, BinaryIO, Dict, Generator, List, Literal, Optional, Set, TextIO, Type, Union, cast, overload
+from typing import (
+    Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO,
+    Type, Union, cast, overload)
 
 from . import T
+from .ui import Styling, AnsiTermStyle
 
 #** Variables **#
 __all__ = ['AnyIO', 'MISSING', 'Context', 'new_context', 'get_current_context']
@@ -57,13 +60,14 @@ class Context:
     """
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
-        'extra', 'stdout', 'stderr')
+        'extra', 'stdout', 'stderr', 'styling')
 
     def __init__(self,
-        parsed: 'ParsedCmd',
-        parent: Optional['Context'] = None,
-        stdout: Optional[AnyIO] = None,
-        stderr: Optional[AnyIO] = None,
+        parsed:  'ParsedCmd',
+        parent:  Optional['Context'] = None,
+        stdout:  Optional[AnyIO]     = None,
+        stderr:  Optional[AnyIO]     = None,
+        styling: Optional[Styling]   = None,
     ):
         self.parsed  = parsed
         self.command = parsed.source
@@ -73,6 +77,7 @@ class Context:
         self.extra   = parent.extra if parent else {}
         self.stdout  = stdout or sys.stdout
         self.stderr  = stderr or sys.stderr
+        self.styling = styling or AnsiTermStyle()
 
     def __repr__(self) -> str:
         """
@@ -132,7 +137,12 @@ class Context:
     def stack(self, parsed: 'ParsedCmd') -> 'Context':
         """
         """
-        context = self.__class__(parsed, self, self.stdout, self.stderr)
+        context = self.__class__(
+            parsed=parsed,
+            parent=self,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            styling=self.styling)
         context_stack.get().append(context)
         return context
 

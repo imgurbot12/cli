@@ -277,8 +277,8 @@ class Parser:
             parsed[flag.name] = self.validate_flag(ctx, flag, fvalue)
         return parsed
 
-    def split_commands(self, ctx: ParseCtx,
-        commands: List[Command], args: List[str]) -> Dict[str, ParsedCmd]:
+    def split_commands(self, ctx: ParseCtx, commands: List[Command],
+        args: List[str]) -> OrderedDict[str, ParsedCmd]:
         """
         """
         indexes = index_commands(commands, args)

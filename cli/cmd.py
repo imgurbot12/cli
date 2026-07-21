@@ -8,6 +8,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, Type, TypeVar, Uni
 
 from .arg import Args
 from .flag import Flags
+from .ui import Styling
 
 #** Variables **#
 __all__ = ['Action', 'Command', 'Commands']
@@ -62,12 +63,13 @@ class Command:
         return f'Command(name={self.name}, aliases={self.aliases!r})'
 
     def __call__(self,
-        args:   Optional[List[str]]      = None,
-        parser: Optional[Type['Parser']] = None,
-        stdout: Optional['AnyIO']        = None,
-        stderr: Optional['AnyIO']        = None,
+        args:    Optional[List[str]]      = None,
+        parser:  Optional[Type['Parser']] = None,
+        stdout:  Optional['AnyIO']        = None,
+        stderr:  Optional['AnyIO']        = None,
+        styling: Optional[Styling]        = None,
     ):
-        return self.run(args, parser, stdout, stderr)
+        return self.run(args, parser, stdout, stderr, styling)
 
     @property
     def categories(self) -> Dict[str, List['Command']]:
@@ -252,27 +254,37 @@ class Command:
             await context.command.run_with_async(context)
 
     def run(self,
-        args:   Optional[List[str]]      = None,
-        parser: Optional[Type['Parser']] = None,
-        stdout: Optional['AnyIO']        = None,
-        stderr: Optional['AnyIO']        = None,
+        args:    Optional[List[str]]      = None,
+        parser:  Optional[Type['Parser']] = None,
+        stdout:  Optional['AnyIO']        = None,
+        stderr:  Optional['AnyIO']        = None,
+        styling: Optional[Styling]        = None,
     ):
         """
         """
         result  = self.parse(args, parser)
-        with new_context(result, stdout=stdout, stderr=stderr) as context:
+        with new_context(result,
+            stdout=stdout,
+            stderr=stderr,
+            styling=styling
+        ) as context:
             self.run_with(context)
 
     async def run_async(self,
-        args:   Optional[List[str]]      = None,
-        parser: Optional[Type['Parser']] = None,
-        stdout: Optional['AnyIO']        = None,
-        stderr: Optional['AnyIO']        = None,
+        args:    Optional[List[str]]      = None,
+        parser:  Optional[Type['Parser']] = None,
+        stdout:  Optional['AnyIO']        = None,
+        stderr:  Optional['AnyIO']        = None,
+        styling: Optional[Styling]        = None,
     ):
         """
         """
         result = self.parse(args, parser)
-        with new_context(result, stdout=stdout, stderr=stderr) as context:
+        with new_context(result,
+            stdout=stdout,
+            stderr=stderr,
+            styling=styling
+        ) as context:
             await self.run_with_async(context)
 
 #** Imports **#
