@@ -3,7 +3,8 @@ CLI Utility Functions
 """
 from io import TextIOBase
 from typing import (
-    Any, BinaryIO, Callable, Optional, TextIO, Type, TypedDict, Union, Unpack, cast, overload)
+    Any, Callable, Optional, Type, TypedDict, Union, cast, overload)
+from typing_extensions import Unpack
 
 from .ui import Color, Style, Styling, AnsiTermStyle
 from .cmd import C, Action, Command
@@ -58,16 +59,21 @@ def echo(
     file      = _get_file(file, err)
     is_binary = not isinstance(file, TextIOBase)
 
+    strip = lambda x: x
+    if not file.isatty():
+        ctx   = get_current_context()
+        strip = ctx.styling.strip
+
     bin = []
     for arg in data:
         if not isinstance(arg, (str, bytes, bytearray)):
             arg = str(arg)
         if is_binary:
-            arg = arg.encode() if isinstance(arg, str) else arg
+            arg = strip(arg).encode() if isinstance(arg, str) else arg
             bin.append(arg)
         else:
             arg = arg.decode() if not isinstance(arg, str) else arg
-            bin.append(arg)
+            bin.append(strip(arg))
 
     j = join.encode() if is_binary else join
     e = end.encode() if is_binary else end
@@ -110,9 +116,11 @@ def secho(
 ):
     """
     """
-    items = []
+    file    = _get_file(file, err)
+    is_atty = file.isatty()
+    items   = []
     for item in data:
-        if not isinstance(item, (bytes, bytearray)):
+        if is_atty and not isinstance(item, (bytes, bytearray)):
             item = style(item, **kwargs)
         items.append(item)
     return echo(*items, file=file, err=err, join=join, end=end)

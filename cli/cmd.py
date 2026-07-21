@@ -117,7 +117,7 @@ class Command:
         category: Optional[str] = None,
         hidden:   bool          = False,
         cls:      None          = None,
-    ) -> Callable[[Callable], Command]:
+    ) -> Callable[[Callable], 'Command']:
         ...
 
     @overload
@@ -140,7 +140,7 @@ class Command:
         category: Optional[str]            = None,
         hidden:   bool                     = False,
         cls:      Optional[Type[C]]        = None,
-    ) -> Union[Callable[[Action], 'Command'], C, Command]:
+    ) -> Union[Callable[[Action], 'Command'], C, 'Command']:
         """
         """
         cname = name if isinstance(name, str) else None
@@ -217,7 +217,7 @@ class Command:
         engine = (parser or Parser)(self)
         return engine.parse(args or sys.argv[1:])
 
-    def _check_run(self, context: Context) -> bool:
+    def _check_run(self, context: 'Context') -> bool:
         """
         """
         is_group = len(self.commands) > 0
@@ -226,7 +226,7 @@ class Command:
                 or len(context.parsed.commands) > 0
         return True
 
-    def run_with(self, context: Context, action: Optional[SyncAction] = None):
+    def run_with(self, context: 'Context', action: Optional[SyncAction] = None):
         """
         """
         act = action or self.action
@@ -241,7 +241,7 @@ class Command:
             context.command.run_with(context)
 
     async def run_with_async(self,
-        context: Context, action: Optional[AsyncAction] = None):
+        context: 'Context', action: Optional[AsyncAction] = None):
         """
         """
         act = action or self.action

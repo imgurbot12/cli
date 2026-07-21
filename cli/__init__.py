@@ -2,9 +2,8 @@
 Command-Line-Interface Parsing Library
 """
 from enum import Enum
-from typing import (
-    Annotated, Callable, Iterable, List, Optional, Type, TypeVar,
-    cast, get_args, get_origin, get_type_hints)
+from typing import Callable, Iterable, List, Optional, Type, TypeVar, cast
+from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 
 #DONE: handle ValueError exceptions on data-type issues
 #TODO: functions:  cli.group/cli.context/cli.echo

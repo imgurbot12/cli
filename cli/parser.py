@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing_extensions import NamedTuple
 
 from . import T
 from .arg import Arg
@@ -54,11 +55,10 @@ def index_commands(
 
 #** Classes **#
 
-@dataclass(slots=True)
-class ParsedCmd:
+class ParsedCmd(NamedTuple):
     source:   Command
     args:     Dict[str, Any]
-    commands: OrderedDict[str, 'ParsedCmd']
+    commands: Dict[str, 'ParsedCmd']
     flags:    Dict[str, Any]
 
 class ParseCtx:
@@ -278,7 +278,7 @@ class Parser:
         return parsed
 
     def split_commands(self, ctx: ParseCtx, commands: List[Command],
-        args: List[str]) -> OrderedDict[str, ParsedCmd]:
+        args: List[str]) -> Dict[str, ParsedCmd]:
         """
         """
         indexes = index_commands(commands, args)

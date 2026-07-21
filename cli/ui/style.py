@@ -1,6 +1,7 @@
 """
 CLI UI Coloring/Styling Utilities
 """
+import re
 from abc import abstractmethod
 from typing import Dict, Literal, Protocol, Tuple, Union
 
@@ -22,6 +23,8 @@ SimpleColor = Literal['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cya
 Color = Union[SimpleColor, Rgb]
 Style = Literal['bold', 'dim', 'underline', 'overline',
     'italic', 'blink', 'reverse', 'strike']
+
+_re_ansi = re.compile(r'\033\[[0-?]*[ -/]*[@-~]')
 
 #** Classes **#
 
@@ -73,6 +76,13 @@ class Styling(Protocol):
         return reset for the specific text styling
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def strip(self, text: str) -> str:
+        """
+        strip styling elements from the given text
+        """
+        raise NotImplementedError()
 
     def format_simple(self, color: SimpleColor) -> str:
         """
@@ -165,3 +175,6 @@ class AnsiTermStyle(Styling):
 
     def reset_style(self, style: Style) -> str:
         return f'\033[{self.ANSI_CLEAR[style]}m'
+
+    def strip(self, text: str) -> str:
+        return _re_ansi.sub("", text)
