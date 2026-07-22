@@ -94,7 +94,7 @@ class Missing(UsageError):
         super().__init__(ctx, missing)
         self.missing = missing
         self.message = 'the following required arguments were not provided'
-        self.missing.sort(key=lambda m: isinstance(m, Arg), reverse=True)
+        self.missing.sort(key=lambda m: isinstance(m, Flag))
 
     def format_message(self, help: Help) -> str:
         elems   = []
@@ -131,7 +131,7 @@ class Invalid(UsageError):
 
     def format_message(self, help: Help) -> str:
         invalid = list(self.invalid.items())
-        invalid.sort(key=lambda i: isinstance(i, Flag))
+        invalid.sort(key=lambda i: isinstance(i[0], Arg))
         return f'{self.message}:' \
             + help.newline \
             + help.buffer(

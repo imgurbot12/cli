@@ -103,6 +103,12 @@ def parse_doc(callable: Callable):
         descriptions[param.strip(strip)] = usage.strip(strip)
     return Doc(' '.join(about), descriptions)
 
+def is_context(typedef: Type) -> bool:
+    """
+    check if the given typdef annotation is context
+    """
+    return inspect.isclass(typedef) and issubclass(typedef, Context)
+
 def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     """
     convert function into a command definition using function doc/signature
@@ -117,7 +123,7 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     flags     = []
     for arg in signature.args:
         typedef = signature.typehints.get(arg, str)
-        if not issubclass(typedef, Context):
+        if not is_context(typedef):
             args.append(Arg[typedef](
                 name=arg,
                 about=doc.params.get(arg, None),
@@ -125,7 +131,7 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
             ))
     for flag in signature.kwargs:
         typedef = signature.typehints.get(flag, str)
-        if not issubclass(typedef, Context):
+        if not is_context(typedef):
             flags.append(Flag[typedef](
                 name=flag,
                 about=doc.params.get(flag, None),

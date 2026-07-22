@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import (
     Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO,
     Type, Union, cast, overload)
+from typing_extensions import Annotated, get_origin, get_args
 
 from . import T
 from .style import Styling, AnsiTermStyle
@@ -50,6 +51,17 @@ def get_current_context(silent: bool = False) -> Optional['Context']:
     except LookupError as e:
         if silent: return None
         raise e
+
+def typecheck(value: Any, typedef: Type) -> bool:
+    """
+    guarded isinstance check that handles specialized typedefs
+    """
+    origin = get_origin(typedef)
+    if origin in (list, dict, set, tuple):
+        typedef = origin
+    elif origin is Annotated:
+        typedef = get_args(typedef)[0]
+    return isinstance(value, typedef)
 
 #** Classes **#
 
@@ -108,7 +120,7 @@ class Context:
         """
         """
         value = dict[name]
-        if ctype is not None and not isinstance(value, ctype):
+        if ctype is not None and not typecheck(value, ctype):
             t1 = type(value).__name__
             t2 = ctype.__name__
             raise TypeError(f'{name!r} ({t1}) is not a {t2}')
@@ -126,7 +138,7 @@ class Context:
             if ctype is not None and issubclass(ctype, self.__class__):
                 return cast(T, self)
             raise KeyError(name)
-        if ctype is not None and not isinstance(value, ctype):
+        if ctype is not None and not typecheck(value, ctype):
             t1 = type(value).__name__
             t2 = ctype.__name__
             raise TypeError(f'{name!r} ({t1}) is not a {t2}')
