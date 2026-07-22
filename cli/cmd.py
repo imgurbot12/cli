@@ -33,6 +33,7 @@ class RunKwargs(TypedDict, total=False):
     stdout:  'AnyIO'
     stderr:  'AnyIO'
     styling: Styling
+    standalone_mode: bool
 
 class Command:
     """
@@ -220,10 +221,7 @@ class Command:
         self._validate_commands()
 
     def parse(self,
-        args:            RunArgs  = None,
-        standalone_mode: bool     = True,
-        **kwargs:        Unpack[RunKwargs],
-    ) -> 'ParsedCmd':
+        args: RunArgs = None, **kwargs: Unpack[RunKwargs]) -> 'ParsedCmd':
         """
         """
         help   = kwargs.get('help') or Help()
@@ -232,7 +230,7 @@ class Command:
         try:
             return engine.parse(args or sys.argv[1:])
         except CliError as err:
-            if not standalone_mode:
+            if not kwargs.get('standalone_mode', True):
                 raise err
             stderr = kwargs.get('stderr') or sys.stderr
             echo(err.show(help), file=stderr)
@@ -280,6 +278,8 @@ class Command:
         result = self.parse(args, **kwargs)
         with new_context(result, **kwargs) as context:
             self.run_with(context)
+        if kwargs.get('standalone_mode', True):
+            sys.exit(0)
 
     async def run_async(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
         """
@@ -287,6 +287,8 @@ class Command:
         result = self.parse(args, **kwargs)
         with new_context(result, **kwargs) as context:
             await self.run_with_async(context)
+        if kwargs.get('standalone_mode', True):
+            sys.exit(0)
 
 #** Imports **#
 from .context import AnyIO, Context, new_context

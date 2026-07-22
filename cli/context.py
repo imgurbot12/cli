@@ -72,7 +72,7 @@ class Context:
     """
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
-        'extra', 'stdout', 'stderr', 'styling', 'help')
+        'extra', 'stdout', 'stderr', 'styling', 'help', 'standalone_mode')
 
     def __init__(self,
         parsed:  'ParsedCmd',
@@ -81,6 +81,7 @@ class Context:
         stdout:  Optional[AnyIO]     = None,
         stderr:  Optional[AnyIO]     = None,
         styling: Optional[Styling]   = None,
+        standalone_mode: bool        = True,
     ):
         self.parsed  = parsed
         self.command = parsed.source
@@ -92,6 +93,7 @@ class Context:
         self.stderr  = stderr or sys.stderr
         self.styling = styling or AnsiTermStyle()
         self.help    = help or Help(styling)
+        self.standalone_mode = standalone_mode
 
     def __repr__(self) -> str:
         """
