@@ -6,7 +6,7 @@ from typing import (
     Any, Callable, Optional, Type, TypedDict, Union, cast, overload)
 from typing_extensions import Unpack
 
-from .ui import Color, Style, Styling, AnsiTermStyle
+from .style import Color, Style, Styling, AnsiTermStyle
 from .cmd import C, Action, Command
 from .context import AnyIO, get_current_context
 from .wraps import into_command

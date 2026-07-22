@@ -4,11 +4,14 @@ CLI Command Implementation
 import sys
 import inspect
 import asyncio
-from typing import Awaitable, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
+from typing import (
+    Awaitable, Callable, Coroutine, Dict, List, Optional, Type, TypeVar,
+    Union, cast, overload)
+from typing_extensions import TypedDict, Unpack
 
 from .arg import Args
 from .flag import Flags
-from .ui import Styling
+from .style import Styling
 
 #** Variables **#
 __all__ = ['Action', 'Command', 'Commands']
@@ -20,7 +23,16 @@ SyncAction  = Callable[..., None]
 AsyncAction = Callable[..., Awaitable[None]]
 Action      = Union[SyncAction, AsyncAction]
 
+RunArgs = Optional[List[str]]
+
 #** Classes **#
+
+class RunKwargs(TypedDict, total=False):
+    help:    'Help'
+    parser:  Type['Parser']
+    stdout:  'AnyIO'
+    stderr:  'AnyIO'
+    styling: Styling
 
 class Command:
     """
@@ -62,14 +74,13 @@ class Command:
     def __repr__(self) -> str:
         return f'Command(name={self.name}, aliases={self.aliases!r})'
 
-    def __call__(self,
-        args:    Optional[List[str]]      = None,
-        parser:  Optional[Type['Parser']] = None,
-        stdout:  Optional['AnyIO']        = None,
-        stderr:  Optional['AnyIO']        = None,
-        styling: Optional[Styling]        = None,
-    ):
-        return self.run(args, parser, stdout, stderr, styling)
+    def __call__(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
+        return self.run(args, **kwargs)
+
+    def variants(self) -> List[str]:
+        """
+        """
+        return [self.name, *self.aliases]
 
     @property
     def categories(self) -> Dict[str, List['Command']]:
@@ -209,13 +220,23 @@ class Command:
         self._validate_commands()
 
     def parse(self,
-        args:   Optional[List[str]]      = None,
-        parser: Optional[Type['Parser']] = None,
+        args:            RunArgs  = None,
+        standalone_mode: bool     = True,
+        **kwargs:        Unpack[RunKwargs],
     ) -> 'ParsedCmd':
         """
         """
-        engine = (parser or Parser)(self)
-        return engine.parse(args or sys.argv[1:])
+        help   = kwargs.get('help') or Help()
+        parser = kwargs.get('parser') or Parser
+        engine = (parser or Parser)(self, help=help)
+        try:
+            return engine.parse(args or sys.argv[1:])
+        except CliError as err:
+            if not standalone_mode:
+                raise err
+            stderr = kwargs.get('stderr') or sys.stderr
+            echo(err.show(help), file=stderr)
+            sys.exit(err.exit_code)
 
     def _check_run(self, context: 'Context') -> bool:
         """
@@ -235,7 +256,7 @@ class Command:
                 func = wrap_ctx(act)
                 co   = func(context)
                 if inspect.isawaitable(co):
-                    asyncio.run(co)
+                    asyncio.run(cast(Coroutine[None, None, None], co))
         for parsed in context.parsed.commands.values():
             context = context.stack(parsed)
             context.command.run_with(context)
@@ -253,41 +274,24 @@ class Command:
             context = context.stack(parsed)
             await context.command.run_with_async(context)
 
-    def run(self,
-        args:    Optional[List[str]]      = None,
-        parser:  Optional[Type['Parser']] = None,
-        stdout:  Optional['AnyIO']        = None,
-        stderr:  Optional['AnyIO']        = None,
-        styling: Optional[Styling]        = None,
-    ):
+    def run(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
         """
         """
-        result  = self.parse(args, parser)
-        with new_context(result,
-            stdout=stdout,
-            stderr=stderr,
-            styling=styling
-        ) as context:
+        result = self.parse(args, **kwargs)
+        with new_context(result, **kwargs) as context:
             self.run_with(context)
 
-    async def run_async(self,
-        args:    Optional[List[str]]      = None,
-        parser:  Optional[Type['Parser']] = None,
-        stdout:  Optional['AnyIO']        = None,
-        stderr:  Optional['AnyIO']        = None,
-        styling: Optional[Styling]        = None,
-    ):
+    async def run_async(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
         """
         """
-        result = self.parse(args, parser)
-        with new_context(result,
-            stdout=stdout,
-            stderr=stderr,
-            styling=styling
-        ) as context:
+        result = self.parse(args, **kwargs)
+        with new_context(result, **kwargs) as context:
             await self.run_with_async(context)
 
 #** Imports **#
 from .context import AnyIO, Context, new_context
-from .wraps import into_command, wrap_ctx, wrap_async
+from .errors import CliError
+from .help import Help
 from .parser import Parser, ParsedCmd
+from .wraps import into_command, wrap_ctx, wrap_async
+from .utils import echo

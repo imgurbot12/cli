@@ -9,7 +9,7 @@ from typing import (
     Type, Union, cast, overload)
 
 from . import T
-from .ui import Styling, AnsiTermStyle
+from .style import Styling, AnsiTermStyle
 
 #** Variables **#
 __all__ = ['AnyIO', 'MISSING', 'Context', 'new_context', 'get_current_context']
@@ -60,11 +60,12 @@ class Context:
     """
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
-        'extra', 'stdout', 'stderr', 'styling')
+        'extra', 'stdout', 'stderr', 'styling', 'help')
 
     def __init__(self,
         parsed:  'ParsedCmd',
         parent:  Optional['Context'] = None,
+        help:    Optional[Help]      = None,
         stdout:  Optional[AnyIO]     = None,
         stderr:  Optional[AnyIO]     = None,
         styling: Optional[Styling]   = None,
@@ -78,11 +79,23 @@ class Context:
         self.stdout  = stdout or sys.stdout
         self.stderr  = stderr or sys.stderr
         self.styling = styling or AnsiTermStyle()
+        self.help    = help or Help(styling)
 
     def __repr__(self) -> str:
         """
         """
         return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
+
+    @property
+    def path(self) -> List['Command']:
+        """
+        """
+        path = []
+        ctx  = self
+        while ctx is not None:
+            path.insert(0, ctx.command)
+            ctx = ctx.parent if ctx else None
+        return path
 
     @property
     def invoked_subcommands(self) -> Optional[List[str]]:
@@ -142,9 +155,12 @@ class Context:
             parent=self,
             stdout=self.stdout,
             stderr=self.stderr,
-            styling=self.styling)
+            styling=self.styling,
+            help=self.help)
         context_stack.get().append(context)
         return context
 
 #** Imports **#
+from .cmd import Command
+from .help import Help
 from .parser import ParsedCmd

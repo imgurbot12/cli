@@ -19,9 +19,9 @@ from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 # - group / command tree (subcmd-required difference)
 
 #DONE: suggestor unit-tests
-#TODO: help-page implementation (with colors)
+#DONE: controls on stripping/ignoring styling when writing to file instead of tty
+#DONE: help-page implementation (with colors)
 #TODO: give indexing another shot (but count down rather than up)
-#TODO: controls on stripping/ignoring styling when writing to file instead of tty
 
 #** Variables **#
 __all__ = [

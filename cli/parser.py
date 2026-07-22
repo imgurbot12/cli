@@ -1,7 +1,7 @@
 """
+CLI Argument Parser
 """
 from collections import OrderedDict
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 from typing_extensions import NamedTuple
 
@@ -10,6 +10,7 @@ from .arg import Arg
 from .cmd import Command
 from .flag import Flag
 from .context import MISSING
+from .help import Help
 
 #** Variables **#
 __all__ = ['Parser', 'ParsedCmd']
@@ -138,44 +139,15 @@ class ParseCtx:
                 raise CommandRequired(self, command[0].commands)
             raise Missing(self, cast(List[Union[Arg, Flag]], self.missing))
 
-class ParseError(Exception):
-
-    def __init__(self, ctx: ParseCtx, *args):
-        super().__init__(ctx, *args)
-        self.ctx = ctx
-
-class CommandRequired(ParseError):
-    def __init__(self, ctx: ParseCtx, commands: List[Command]):
-        super().__init__(ctx, commands)
-        self.commands = commands
-
-class Missing(ParseError):
-    def __init__(self, ctx: ParseCtx, missing: List[Union[Arg, Flag]]):
-        super().__init__(ctx, missing)
-        self.missing = missing
-
-class MissingValue(ParseError):
-    def __init__(self, ctx: ParseCtx, missing: List[Flag]):
-        super().__init__(ctx, missing)
-        self.missing = missing
-
-class Invalid(ParseError):
-    def __init__(self, ctx: ParseCtx, invalid: Dict[Union[Arg, Flag], str]):
-        super().__init__(ctx, invalid)
-        self.invalid = invalid
-
-class Unexpected(ParseError):
-    def __init__(self, ctx: ParseCtx, unexpected: List[str]):
-        super().__init__(ctx, unexpected)
-        self.unexpected = unexpected
-
 class Parser:
     """
     """
-    __slots__ = ('command', )
+    __slots__ = ('command', 'help')
 
-    def __init__(self, command: Command):
+    def __init__(self, command: Command, help: Optional[Help] = None):
+        self.help    = help or Help()
         self.command = command
+        self.help.apply_helpers(command)
         self.command.validate()
 
     def validate_arg(self,
@@ -301,13 +273,47 @@ class Parser:
             ctx.add_missing(ctx.command)
         return OrderedDict(parsed)
 
+    def split_help(self, ctx: ParseCtx, args: List[str]):
+        """
+        """
+        for variant in self.help.flag.variants():
+            if variant in args:
+                raise HelpError(ctx, self.command)
+
+        variants = self.help.command.variants()
+        for idx, arg in enumerate(args, 0):
+            if arg not in variants:
+                continue
+
+            cmd  = self.command
+            path = args[idx+1:]
+            for item in path:
+                variants = {v:c for c in cmd.commands for v in c.variants()}
+                if item not in variants:
+                    raise InvalidCommand(ctx, item)
+                cmd = variants[item]
+            raise HelpError(ctx, cmd)
+
     def parse(self, args: List[str]) -> ParsedCmd:
         """
         """
         args     = args.copy()
+        nargs    = len(args)
         ctx      = ParseCtx([self.command])
-        commands = self.split_commands(ctx, self.command.commands, args)
-        flags    = self.split_flags(ctx, self.command.flags, args)
-        params   = self.split_args(ctx, self.command.args, args)
-        ctx.finalize()
+        self.split_help(ctx, args)
+
+        try:
+            commands = self.split_commands(ctx, self.command.commands, args)
+            flags    = self.split_flags(ctx, self.command.flags, args)
+            params   = self.split_args(ctx, self.command.args, args)
+            ctx.finalize()
+        except CliError as err:
+            if nargs == 0:
+                raise HelpError(ctx, self.command) from None
+            raise err
         return ParsedCmd(self.command, params, commands, flags)
+
+#** Imports **#
+from .errors import (
+    CliError, CommandRequired, HelpError, Invalid, InvalidCommand, Missing,
+    MissingValue, Unexpected)
