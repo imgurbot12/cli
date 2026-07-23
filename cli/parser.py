@@ -142,11 +142,19 @@ class ParseCtx:
 class Parser:
     """
     """
-    __slots__ = ('command', 'help')
+    __slots__ = ('command', 'complete', 'help')
 
-    def __init__(self, command: Command, help: Optional[Help] = None):
-        self.help    = help or Help()
-        self.command = command
+    def __init__(self,
+        command:  Command,
+        help:     Optional[Help]    = None,
+        complete: Optional[Command] = None,
+    ):
+        self.help     = help or Help()
+        self.command  = command
+        self.complete = complete or autocomplete_cmd()
+
+        if self.complete not in self.command.commands:
+            self.command.commands.append(self.complete)
         self.help.apply_helpers(command)
         self.command.validate()
 
@@ -200,7 +208,7 @@ class Parser:
         while cmdargs and args:
             cmdarg = cmdargs[0]
             value  = args.pop(0) if args else MISSING
-            if value == '--':
+            if value == '--' and error_flags:
                 error_flags = False
                 continue
 
@@ -317,3 +325,4 @@ class Parser:
 from .errors import (
     CliError, CommandRequired, HelpError, Invalid, InvalidCommand, Missing,
     MissingValue, Unexpected)
+from .suggest import autocomplete_cmd

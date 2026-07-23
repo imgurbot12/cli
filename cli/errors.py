@@ -1,7 +1,7 @@
 """
 
 """
-from typing import ClassVar, Dict, List, Union
+from typing import ClassVar, Dict, List, Optional, Union
 
 from .arg import Arg
 from .cmd import Command
@@ -11,9 +11,10 @@ from .parser import ParseCtx
 
 #** Variables **#
 __all__ = [
-    'HelpError',
+    'Exit',
     'CliError',
 
+    'HelpError',
     'CommandRequired',
     'InvalidCommand',
     'Missing',
@@ -23,6 +24,10 @@ __all__ = [
 ]
 
 #** Classes **#
+
+class Exit(RuntimeError):
+    def __init__(self, exit_code: int = 0):
+        self.exit_code = exit_code
 
 class CliError(Exception):
     exit_code: ClassVar[int] = 1
@@ -37,9 +42,10 @@ class CliError(Exception):
         """
         return self.message
 
-    def show(self, help: Help) -> str:
+    def show(self, help: Optional[Help] = None) -> str:
         """
         """
+        help = help or Help()
         return help.styling.wrap_color('red', 'error:') \
             + help.space \
             + self.format_message(help) \
@@ -54,7 +60,8 @@ class HelpError(CliError):
         self.ctx     = ctx
         self.command = command
 
-    def show(self, help: Help) -> str:
+    def show(self, help: Optional[Help] = None) -> str:
+        help = help or Help()
         return help.help(self.ctx, self.command)
 
 class UsageError(CliError):

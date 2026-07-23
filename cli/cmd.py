@@ -5,9 +5,9 @@ import sys
 import inspect
 import asyncio
 from typing import (
-    Awaitable, Callable, Coroutine, Dict, List, Optional, Type, TypeVar,
-    Union, cast, overload)
-from typing_extensions import TypedDict, Unpack
+    Awaitable, Callable, Coroutine, Dict, List, Literal, Optional, Type,
+    TypeVar, Union, cast, overload)
+from typing_extensions import NoReturn, TypedDict, Unpack
 
 from .arg import Args
 from .flag import Flags
@@ -32,15 +32,15 @@ class RunKwargs(TypedDict, total=False):
     parser:  Type['Parser']
     stdout:  'AnyIO'
     stderr:  'AnyIO'
+    suggest: 'SuggestorCLS'
     styling: Styling
-    standalone_mode: bool
 
 class Command:
     """
     """
     __slots__ = (
         'name', 'about', 'version', 'authors', 'category', 'hidden',
-        'args', 'flags', 'commands', 'aliases', 'action',
+        'suggest', 'args', 'flags', 'commands', 'aliases', 'action',
         'invoke_without_command',)
 
     def __init__(self,
@@ -50,6 +50,7 @@ class Command:
         authors:                Optional[List[str]] = None,
         category:               Optional[str]       = None,
         hidden:                 bool                = False,
+        suggest:                bool                = True,
         args:                   Optional[Args]      = None,
         flags:                  Optional[Flags]     = None,
         commands:               Optional[Commands]  = None,
@@ -65,6 +66,7 @@ class Command:
         self.authors                = authors
         self.category               = category or '*'
         self.hidden                 = hidden
+        self.suggest                = suggest
         self.args                   = args or []
         self.flags                  = flags or []
         self.commands               = commands or []
@@ -75,8 +77,31 @@ class Command:
     def __repr__(self) -> str:
         return f'Command(name={self.name}, aliases={self.aliases!r})'
 
-    def __call__(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
-        return self.run(args, **kwargs)
+    @overload
+    def __call__(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: Literal[True] = True,
+        **kwargs: Unpack[RunKwargs]
+    ) -> NoReturn:
+        ...
+
+    @overload
+    def __call__(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: Literal[False] = False,
+        **kwargs: Unpack[RunKwargs]
+    ) -> None:
+        ...
+
+    def __call__(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: bool = True,
+        **kwargs: Unpack[RunKwargs]
+    ):
+        return self.run(args, standalone_mode=standalone_mode, **kwargs)
 
     def variants(self) -> List[str]:
         """
@@ -138,7 +163,7 @@ class Command:
         about:    Optional[str] = None,
         category: Optional[str] = None,
         hidden:   bool          = False,
-        cls:      Type[C]     = ...,
+        *, cls: Type[C],
     ) -> Callable[[Callable], C]:
         ...
 
@@ -221,7 +246,11 @@ class Command:
         self._validate_commands()
 
     def parse(self,
-        args: RunArgs = None, **kwargs: Unpack[RunKwargs]) -> 'ParsedCmd':
+        args: RunArgs = None,
+        *,
+        standalone_mode: bool = True,
+        **kwargs: Unpack[RunKwargs]
+    ) -> 'ParsedCmd':
         """
         """
         help   = kwargs.get('help') or Help()
@@ -230,7 +259,7 @@ class Command:
         try:
             return engine.parse(args or sys.argv[1:])
         except CliError as err:
-            if not kwargs.get('standalone_mode', True):
+            if not standalone_mode:
                 raise err
             stderr = kwargs.get('stderr') or sys.stderr
             echo(err.show(help), file=stderr)
@@ -272,28 +301,58 @@ class Command:
             context = context.stack(parsed)
             await context.command.run_with_async(context)
 
-    def run(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
-        """
-        """
-        result = self.parse(args, **kwargs)
-        with new_context(result, **kwargs) as context:
-            self.run_with(context)
-        if kwargs.get('standalone_mode', True):
-            sys.exit(0)
+    @overload
+    def run(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: Literal[True] = True,
+        **kwargs: Unpack[RunKwargs]
+    ) -> NoReturn:
+        ...
 
-    async def run_async(self, args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
+    @overload
+    def run(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: Literal[False] = False,
+        **kwargs: Unpack[RunKwargs]
+    ) -> None:
+        ...
+
+    def run(self,
+        args: RunArgs = None,
+        *,
+        standalone_mode: bool = True,
+        **kwargs: Unpack[RunKwargs]
+    ):
         """
         """
-        result = self.parse(args, **kwargs)
-        with new_context(result, **kwargs) as context:
+        code   = 0
+        result = self.parse(args, standalone_mode=standalone_mode, **kwargs)
+        with new_context(result,
+            standalone_mode=standalone_mode, **kwargs) as context:
+            try:
+                self.run_with(context)
+            except Exit as err:
+                if not standalone_mode:
+                    raise err
+                code = err.exit_code
+        if standalone_mode:
+            sys.exit(code)
+
+    async def run_async(self,
+        args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
+        """
+        """
+        result = self.parse(args, standalone_mode=False, **kwargs)
+        with new_context(result, standalone_mode=False, **kwargs) as context:
             await self.run_with_async(context)
-        if kwargs.get('standalone_mode', True):
-            sys.exit(0)
 
 #** Imports **#
 from .context import AnyIO, Context, new_context
-from .errors import CliError
+from .errors import CliError, Exit
 from .help import Help
 from .parser import Parser, ParsedCmd
+from .suggest import SuggestorCLS
 from .wraps import into_command, wrap_ctx, wrap_async
 from .utils import echo

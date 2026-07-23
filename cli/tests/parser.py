@@ -12,6 +12,8 @@ from ..parser import Invalid, MissingValue, ParseCtx, CommandRequired, Missing, 
 #** Variables **#
 __all__ = ['ParserTests']
 
+DEFAULT_OPTS = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None, 'help': False}
+
 #** Classes **#
 
 class ParserTests(TestCase):
@@ -155,10 +157,9 @@ class ParserTests(TestCase):
         """
         ensure repeated flags work as intended or error if not repeat
         """
-        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': [1,2,3]}
         result = self.parse(['-r', '1', '-r', '2', '-r', '3'])
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, opts)
+        self.assertDictEqual(result.flags, {**DEFAULT_OPTS, 'repeat': [1,2,3]})
         self.assertDictEqual(result.commands, {})
         self.assertUnexpectedMulti([
             (['-u', 'a', '-u', 'b'], [], ['-u', 'b']),
@@ -222,40 +223,38 @@ class ParserTests(TestCase):
         """
         ensure simple single-command parse works as intended
         """
-        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         result = self.parse([])
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, opts)
+        self.assertDictEqual(result.flags, DEFAULT_OPTS)
         self.assertDictEqual(result.commands, {})
 
         result = self.parse(['-d'])
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, {**opts, 'debug': True})
+        self.assertDictEqual(result.flags, {**DEFAULT_OPTS, 'debug': True})
         self.assertDictEqual(result.commands, {})
 
         for value in ('info', '20'):
             with self.subTest(value):
                 result = self.parse(['-l', value])
                 self.assertDictEqual(result.args, {})
-                self.assertDictEqual(result.flags, {**opts, 'log': 20})
+                self.assertDictEqual(result.flags, {**DEFAULT_OPTS, 'log': 20})
                 self.assertDictEqual(result.commands, {})
 
     def test_sub_command(self):
         """
         ensure single sub-command parse works as intended
         """
-        opts   = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         result = self.parse(['echo', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, opts)
+        self.assertDictEqual(result.flags, DEFAULT_OPTS)
         self.assertEqual(len(result.commands), 1)
         self.assertDictEqual(echo.flags, {'dry': True, 'file': Path('file')})
 
         result = self.parse(['echo', '--', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
         self.assertDictEqual(result.args, {})
-        self.assertDictEqual(result.flags, opts)
+        self.assertDictEqual(result.flags, DEFAULT_OPTS)
         self.assertEqual(len(result.commands), 1)
         self.assertDictEqual(echo.args, {'test': ['-d', '-f', 'file', 'test']})
         self.assertDictEqual(echo.flags, {'dry': False, 'file': None})
@@ -264,14 +263,13 @@ class ParserTests(TestCase):
         """
         ensure double sub-command parse works as intended
         """
-        opts = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None}
         args = (['do', 'run', '--', '5'], ['do', 'run', '5'])
         for args in args:
             with self.subTest(args):
                 result = self.parse(args)
                 do     = result.commands['do']
                 self.assertDictEqual(result.args, {})
-                self.assertDictEqual(result.flags, opts)
+                self.assertDictEqual(result.flags, DEFAULT_OPTS)
                 self.assertDictEqual(do.args, {})
                 self.assertDictEqual(do.flags, {'kill': False})
                 self.assertDictEqual(do.commands['run'].args, {'dist1': 5, 'dist2': 42})

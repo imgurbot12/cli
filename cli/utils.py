@@ -141,7 +141,7 @@ def command(
     about:    Optional[str] = None,
     category: Optional[str] = None,
     hidden:   bool          = False,
-    cls:      Type[C]     = ...,
+    *, cls:   Type[C],
 ) -> Callable[[Callable], C]:
     ...
 
@@ -191,7 +191,7 @@ def group(
     about:    Optional[str]      = None,
     category: Optional[str]      = None,
     hidden:   bool               = False,
-    cls:      Type[C]            = ...,
+    *, cls:   Type[C],
     invoke_without_command: bool = False,
 ) -> Callable[[Callable], C]:
     ...

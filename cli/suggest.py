@@ -1,24 +1,54 @@
 """
 CLI Autocomplete Suggestion Implementation
 """
-from typing import Any, Iterator, List, Mapping, Optional, Sequence, Set, Tuple, Union
+import functools
+from typing import (
+    Any, Iterator, List, Mapping, Optional, Sequence, Set,
+    Tuple, Type, Union)
 
 from . import SuggestFunc
 from .arg import Arg
+from .context import Context
 from .cmd import Command
 from .flag import Flag
 from .parser import index_commands, index_flags
+from .utils import echo
 
 #** Variables **#
-__all__ = ['SuggestFunc', 'Suggest', 'Suggestor', 'suggest_static']
+__all__ = ['SuggestorCLS', 'SuggestFunc', 'Suggest', 'Suggestor', 'suggest_static']
 
 Hints  = Iterator[str]
 Static = Union[Sequence[str], Set[str], Mapping[str, Any]]
+
+SuggestorCLS = Type['Suggestor']
 
 #** Functions **#
 
 def empty():
     yield from ()
+
+def _action(ctx: Context):
+    """
+    """
+    suggestor = ctx.suggestor()
+    pos       = ctx.get_arg('pos', int)
+    args      = ctx.get_arg('args', List[str])
+    partial   = len(args) > pos
+    for suggest in suggestor.suggest(args, partial):
+        echo(suggest)
+    ctx.exit()
+
+@functools.lru_cache()
+def autocomplete_cmd() -> Command:
+    """
+    """
+    return Command(
+        name='__autocomplete',
+        about='Hidden autocompletion command',
+        args=[Arg[int]('pos'), Arg[str]('args', repeat=True)],
+        hidden=True,
+        action=_action,
+    )
 
 def suggest_options(options: List[str], value: str) -> Hints:
     """
@@ -80,7 +110,9 @@ class Suggestor:
         indexes = index_flags(flags, args)
         if not indexes:
             return None, []
-        index, flag  = indexes[-1]
+        index, flag = indexes[-1]
+        if flag.suggestor is False:
+            return None, []
         args[:index] = []
         return flag, [f for _,f in indexes]
 
@@ -97,7 +129,11 @@ class Suggestor:
             cmdarg = cmdargs[0]
             if not cmdarg.repeat:
                 cmdargs.pop(0)
-        return cmdargs[0] if cmdargs else None
+
+        if not cmdargs:
+            return None
+        cmd = cmdargs[0]
+        return None if cmd.suggestor is False else cmd
 
     def suggest_options(self, options: List[str], value: str) -> Hints:
         """
@@ -109,7 +145,7 @@ class Suggestor:
         """
         results   = []
         suggestor = source.suggestor
-        if suggestor is not None:
+        if callable(suggestor):
             for item in suggestor(value):
                 if item not in results:
                     results.append(item)
@@ -120,8 +156,6 @@ class Suggestor:
                 if item not in results:
                     results.append(item)
         yield from results
-
-    # partial = len(args) > spaces
 
     def suggest(self, args: List[str], partial: bool = False) -> Hints:
         """
@@ -155,13 +189,14 @@ class Suggestor:
 
         value      = args[-1] if args and partial else ''
         all_flags  = command.visible_flags()
-        flags      = [f for f in all_flags if f not in fmatched or f.repeat]
+        flags      = (f for f in all_flags if f not in fmatched or f.repeat)
+        flags      = [f for f in flags if f.suggestor is not False]
         f_required = [f for f in flags if f.required]
         if f_required:
             options = [v for flag in f_required for v in flag.variants()]
             return self.suggest_options(options, value)
 
-        options = [c.name for c in command.visible_commands()]
+        options = [c.name for c in command.visible_commands() if c.suggest]
         if options and not command.invoke_without_command:
             return self.suggest_options(options, value)
 

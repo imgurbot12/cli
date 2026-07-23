@@ -2,7 +2,8 @@
 Command-Line-Interface Parsing Library
 """
 from enum import Enum
-from typing import Callable, Iterable, List, Optional, Type, TypeVar, cast
+from typing import (
+    Callable, Iterable, List, Literal, Optional, Type, TypeVar, Union, cast)
 from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 
 #DONE: handle ValueError exceptions on data-type issues
@@ -37,9 +38,11 @@ __all__ = [
     'Context',
     'Flag',
 
+    'CliError',
     'Validate',
     'Suggest',
 
+    'Help',
     'Parser',
     'ParsedCmd',
     'Suggestor',
@@ -47,7 +50,9 @@ __all__ = [
 
 E = TypeVar('E', bound=Enum)
 T = TypeVar('T')
+
 SuggestFunc = Callable[[str], Iterable[str]]
+OptSuggest  = Union['SuggestFunc', Literal[False], None]
 
 #** Functions **#
 
@@ -68,9 +73,11 @@ def get_type(self, ftype: Optional[Type[T]]) -> Type[T]:
                 return hints['return']
     return cast(Type, str)
 
-def get_suggestor(type: Type) -> Optional[SuggestFunc]:
+def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
     """
     """
+    if suggest is not None:
+        return suggest
     if get_origin(type) is not Annotated:
         return
     for arg in get_args(type):
@@ -97,7 +104,9 @@ def get_validator(type: Type,
 from .arg import Arg
 from .cmd import Command
 from .context import Context, get_current_context
+from .errors import CliError
 from .flag import Flag
+from .help import Help
 from .parser import Parser, ParsedCmd
 from .suggest import Suggest, Suggestor
 from .utils import echo, style, secho, command, group

@@ -72,16 +72,17 @@ class Context:
     """
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
-        'extra', 'stdout', 'stderr', 'styling', 'help', 'standalone_mode')
+        'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help', 'standalone_mode')
 
     def __init__(self,
         parsed:  'ParsedCmd',
-        parent:  Optional['Context'] = None,
-        help:    Optional[Help]      = None,
-        stdout:  Optional[AnyIO]     = None,
-        stderr:  Optional[AnyIO]     = None,
-        styling: Optional[Styling]   = None,
-        standalone_mode: bool        = True,
+        parent:  Optional['Context']      = None,
+        help:    Optional[Help]           = None,
+        stdout:  Optional[AnyIO]          = None,
+        stderr:  Optional[AnyIO]          = None,
+        suggest: Optional['SuggestorCLS'] = None,
+        styling: Optional[Styling]        = None,
+        standalone_mode: bool             = True,
     ):
         self.parsed  = parsed
         self.command = parsed.source
@@ -91,6 +92,7 @@ class Context:
         self.extra   = parent.extra if parent else {}
         self.stdout  = stdout or sys.stdout
         self.stderr  = stderr or sys.stderr
+        self.suggest = suggest or Suggestor
         self.styling = styling or AnsiTermStyle()
         self.help    = help or Help(styling)
         self.standalone_mode = standalone_mode
@@ -117,6 +119,16 @@ class Context:
         """
         commands = list(self.parsed.commands.keys())
         return commands if commands else None
+
+    def suggestor(self) -> Suggestor:
+        """
+        """
+        return self.suggest(self.path[0])
+
+    def exit(self, exit_code: int = 0):
+        """
+        """
+        raise Exit(exit_code)
 
     def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
         """
@@ -169,6 +181,7 @@ class Context:
             parent=self,
             stdout=self.stdout,
             stderr=self.stderr,
+            suggest=self.suggest,
             styling=self.styling,
             help=self.help)
         context_stack.get().append(context)
@@ -177,4 +190,6 @@ class Context:
 #** Imports **#
 from .cmd import Command
 from .help import Help
+from .errors import Exit
 from .parser import ParsedCmd
+from .suggest import Suggestor, SuggestorCLS

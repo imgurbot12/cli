@@ -1,6 +1,7 @@
 """
 Help Page Generation
 """
+import functools
 from typing import Callable, List, Optional, Union
 
 from . import T
@@ -11,6 +12,19 @@ from .style import AnsiTermStyle, Styling
 
 #** Variables **#
 __all__ = ['Help']
+
+#** Functions **#
+
+@functools.lru_cache()
+def help_flag() -> Flag:
+    return Flag[bool]('help', 'Print help', suggestor=False)
+
+@functools.lru_cache()
+def help_command() -> Command:
+    return Command(
+        name='help',
+        about='Print this message or the help of the given subcommand(s)',
+        suggest=False)
 
 #** Classes **#
 
@@ -29,9 +43,8 @@ class Help:
         self.indent  = indent
         self.space   = space
         self.newline = newline
-        self.flag    = Flag[bool]('help', 'Print help')
-        self.command = Command('help',
-            'Print this message or the help of the given subcommand(s)')
+        self.flag    = help_flag()
+        self.command = help_command()
 
     def apply_helpers(self, command: Command):
         """
@@ -40,8 +53,6 @@ class Help:
             command.flags.append(self.flag)
         if command.commands and self.command not in command.commands:
             command.commands.append(self.command)
-            for command in command.commands:
-                self.apply_helpers(command)
 
     def buffer(self,
         items:     List[T],
@@ -170,22 +181,22 @@ class Help:
                     left=lambda arg: self.arg_usage(ctx, arg),
                     right=self.about,
                 )
-        if cmd.commands:
+        if cmd.visible_commands():
             help += self.newline \
                 + self.styling.wrap_style('underline', 'Commands:') \
                 + self.newline \
                 + self.buffer(
-                    items=cmd.commands,
+                    items=cmd.visible_commands(),
                     left=lambda c: c.name,
                     right=lambda c: c.about or '',
                 )
-        if cmd.flags:
+        if cmd.visible_flags():
             short = any(f.short is not None for f in cmd.flags)
             help += self.newline \
                 + self.styling.wrap_style('underline', 'Options:') \
                 + self.newline \
                 + self.buffer(
-                    items=cmd.flags,
+                    items=cmd.visible_flags(),
                     left=lambda f: self.flag_usage(ctx, f, short),
                     right=self.about,
                 )
