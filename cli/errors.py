@@ -88,7 +88,7 @@ class CommandRequired(UsageError):
         self.message  = 'requires a subcommand but one was not provided'
 
     def format_message(self, help: Help) -> str:
-        commands = self.ctx.command.commands
+        commands = self.ctx.command.visible_commands()
         name = help.styling.wrap_color('yellow', repr(self.ctx.command.name))
         cmds = [help.styling.wrap_color('green', c.name) for c in commands]
         return f'{name} {self.message}' \

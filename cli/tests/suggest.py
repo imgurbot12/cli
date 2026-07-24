@@ -4,16 +4,18 @@ CLI Suggestion UnitTests
 from typing import List
 from unittest import TestCase
 
-from ._apps import USERS, APP_V1
+from ._apps import USERS, APP_V1, APP_V2
 from .. import Command, Suggestor
 
 #** Variables **#
-__all__ = ['SuggestTests']
+__all__ = ['SuggestTestsV1', 'SuggestTestsV2']
 
 #** Classes **#
 
 class SuggestTests(TestCase):
-    app: Command = APP_V1
+    __test__ = False
+
+    app: Command
 
     def suggest(self, args: List[str], partial: bool = False) -> List[str]:
         """
@@ -64,3 +66,11 @@ class SuggestTests(TestCase):
         self.assertSuggest(['do', 'run', '1', '1'], ['--km'])
         self.assertSuggest(['do', 'fly'], [])
         self.assertSuggest(['do', 'fly', '1'], ['--km'])
+
+class SuggestTestsV1(SuggestTests):
+    __test__ = True
+    app: Command = APP_V1
+
+class SuggestTestsV2(SuggestTests):
+    __test__ = True
+    app: Command = APP_V2

@@ -3,7 +3,7 @@ Command-Line-Interface Parsing Library
 """
 from enum import Enum
 from typing import (
-    Callable, Iterable, List, Literal, Optional, Type, TypeVar, Union, cast)
+    Callable, Iterable, List, Literal, NamedTuple, Optional, Tuple, Type, TypeVar, Union, cast)
 from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 
 #DONE: handle ValueError exceptions on data-type issues
@@ -29,6 +29,7 @@ __all__ = [
     'echo',
     'style',
     'secho',
+    'option',
     'command',
     'group',
     'get_current_context',
@@ -54,24 +55,37 @@ T = TypeVar('T')
 SuggestFunc = Callable[[str], Iterable[str]]
 OptSuggest  = Union['SuggestFunc', Literal[False], None]
 
+#** Classes **#
+
+class _Meta(NamedTuple):
+    repeat:   bool = False
+
 #** Functions **#
 
-def get_type(self, ftype: Optional[Type[T]]) -> Type[T]:
+def get_type(self, ftype: Optional[Type[T]]) -> Tuple[Type[T], _Meta]:
     """
     """
     ftype = ftype or getattr(self, 'type', None)
     if ftype is not None:
-        return ftype
+        origin = get_origin(ftype)
+        args   = get_args(ftype)
+        if origin is None or origin is Annotated:
+            return ftype, _Meta()
+        if origin in (list, set):
+            return args[0], _Meta(repeat=True)
+        if origin is Union and len(args) == 2 and args[1] is type(None):
+            return get_type(self, args[0])
+        raise TypeError(ftype)
     default = getattr(self, 'default', None)
     if default is not None:
-        return type(self.default)
+        return type(self.default), _Meta()
     validators = getattr(self, 'validators', None)
     if validators:
         for validator in validators[::-1]:
             hints = get_type_hints(validator)
             if 'return' in hints:
                 return hints['return']
-    return cast(Type, str)
+    return cast(Type, str), _Meta()
 
 def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
     """
@@ -109,5 +123,5 @@ from .flag import Flag
 from .help import Help
 from .parser import Parser, ParsedCmd
 from .suggest import Suggest, Suggestor
-from .utils import echo, style, secho, command, group
+from .utils import echo, style, secho, option, command, group
 from .validate import DEFAULT_VALIDATORS, Validate, ValidatorFunc

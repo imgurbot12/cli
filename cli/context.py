@@ -57,10 +57,13 @@ def typecheck(value: Any, typedef: Type) -> bool:
     guarded isinstance check that handles specialized typedefs
     """
     origin = get_origin(typedef)
+    args   = get_args(typedef)
     if origin in (list, dict, set, tuple):
         typedef = origin
+    elif origin is Union:
+        return any(typecheck(value, a) for a in args)
     elif origin is Annotated:
-        typedef = get_args(typedef)[0]
+        typedef = args[0]
     return isinstance(value, typedef)
 
 #** Classes **#

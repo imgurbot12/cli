@@ -2,17 +2,20 @@
 CLI Utility Functions
 """
 from io import TextIOBase
+from collections import OrderedDict
 from typing import (
-    Any, Callable, Optional, Type, TypedDict, Union, cast, overload)
+    Any, Callable, List, Optional, Type, TypedDict, Union, cast, overload)
 from typing_extensions import Unpack
 
-from .style import Color, Style, Styling, AnsiTermStyle
+from . import T, OptSuggest
+from .flag import Short, Flag
 from .cmd import C, Action, Command
 from .context import AnyIO, get_current_context
-from .wraps import into_command
+from .style import Color, Style, Styling, AnsiTermStyle
+from .wraps import ARG_ATTR, FLAG_ATTR, into_command
 
 #** Variables **#
-__all__ = ['echo', 'style', 'secho', 'command', 'group']
+__all__ = ['echo', 'style', 'secho', 'option', 'command', 'group']
 
 #** Classes **#
 
@@ -125,13 +128,46 @@ def secho(
         items.append(item)
     return echo(*items, file=file, err=err, join=join, end=end)
 
+def option(
+    name:       str,
+    about:      Optional[str]                      = None,
+    short:      Optional[Short]                    = None,
+    long:       Optional[str]                      = None,
+    hidden:     bool                               = False,
+    validators: Optional[List[Callable[[Any], T]]] = None,
+    suggestor:  OptSuggest                         = None,
+    required:   bool                               = False,
+):
+    """
+    """
+    flag = dict(
+        about=about,
+        short=short,
+        long=long,
+        hidden=hidden,
+        validators=validators,
+        suggestor=suggestor,
+        required=required,
+    )
+    def wrapper(func: Callable) -> Callable:
+        """
+        """
+        flags = getattr(func, FLAG_ATTR, None) or OrderedDict()
+        if name in flags:
+            raise RuntimeError(f'Flag: {name!r} already defined.')
+        flags[name] = flag
+        setattr(func, FLAG_ATTR, flags)
+        return func
+    return wrapper
+
 @overload
 def command(
-    name:     Optional[str] = None,
-    about:    Optional[str] = None,
-    category: Optional[str] = None,
-    hidden:   bool          = False,
-    cls:      None          = None,
+    name:     Optional[str]      = None,
+    about:    Optional[str]      = None,
+    category: Optional[str]      = None,
+    hidden:   bool               = False,
+    cls:      None               = None,
+    invoke_without_command: bool = False,
 ) -> Callable[[Callable], Command]:
     ...
 
@@ -142,6 +178,7 @@ def command(
     category: Optional[str] = None,
     hidden:   bool          = False,
     *, cls:   Type[C],
+    invoke_without_command: bool = False,
 ) -> Callable[[Callable], C]:
     ...
 
@@ -155,6 +192,7 @@ def command(
     category: Optional[str]            = None,
     hidden:   bool                     = False,
     cls:      Optional[Type[C]]        = None,
+    invoke_without_command: bool       = False,
 ) -> Union[Callable[[Action], Command], C, Command]:
     """
     Generate a new `Command` and uses the new decorated function as its action.
@@ -171,6 +209,7 @@ def command(
         cmd.about    = about or cmd.about
         cmd.category = category or cmd.category
         cmd.hidden   = hidden or cmd.hidden
+        cmd.invoke_without_command = invoke_without_command
         return cmd
     return wrapper(name) if callable(name) else wrapper
 

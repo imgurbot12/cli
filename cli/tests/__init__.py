@@ -3,8 +3,13 @@ CLI Implementation UnitTests
 """
 
 #** Variables **#
-__all__ = ['ParserTests', 'SuggestTests']
+__all__ = [
+    'ParserTestsV1',
+    'ParserTestsV2',
+    'SuggestTestsV1',
+    'SuggestTestsV2'
+]
 
 #** Imports **#
-from .parser import ParserTests
-from .suggest import SuggestTests
+from .parser import ParserTestsV1, ParserTestsV2
+from .suggest import SuggestTestsV1, SuggestTestsV2

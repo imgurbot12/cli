@@ -2,10 +2,12 @@
 CLI Action Argument Construction Wrappers
 """
 import asyncio
+from collections import OrderedDict
 import inspect
 import functools
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Type, TypeVar
 
+from . import T
 from .arg import Arg
 from .flag import Flag
 from .cmd import Action, AsyncAction, Command
@@ -17,6 +19,12 @@ R = TypeVar('R')
 
 #: hidden attribute tied to context wrapper
 WRAP_CTX_ATTR = '__cli_wrapped_ctx'
+
+#: hidden attribute used to cache arg definitions
+ARG_ATTR = '__cli_arg'
+
+#: hidden attribute used to cache flag definitions
+FLAG_ATTR = '__cli_flags'
 
 #** Classes **#
 
@@ -117,34 +125,51 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     :param cls:      command class factory
     :return:         command generated from function
     """
-    doc       = parse_doc(callable)
-    signature = get_signature(callable)
-    args      = []
-    flags     = []
-    for arg in signature.args:
-        typedef = signature.typehints.get(arg, str)
-        if not is_context(typedef):
-            args.append(Arg[typedef](
-                name=arg,
-                about=doc.params.get(arg, None),
-                default=signature.defaults.get(arg, None),
-            ))
-    for flag in signature.kwargs:
-        typedef = signature.typehints.get(flag, str)
-        if not is_context(typedef):
-            flags.append(Flag[typedef](
-                name=flag,
-                about=doc.params.get(flag, None),
-                default=signature.defaults.get(flag, None),
-                required=flag not in signature.defaults,
-            ))
-    if signature.arg_splat is not None:
-        typedef = signature.typehints.get(signature.arg_splat, str)
+    doc           = parse_doc(callable)
+    signature     = get_signature(callable)
+    args          = []
+    flags         = []
+    args_default  = getattr(callable, ARG_ATTR, {})
+    flags_default = getattr(callable, FLAG_ATTR, {})
+    for name in signature.args:
+        typedef = signature.typehints.get(name, str)
+        if is_context(typedef):
+            continue
+        kwargs = args_default.get(name) or {}
+        about  = kwargs.pop('about', None) or doc.params.get(name) or ''
         args.append(Arg[typedef](
-            name=signature.arg_splat,
-            about=doc.params.get(signature.arg_splat, None),
+            name=name,
+            about=about,
+            default=signature.defaults.get(name, None),
+            **kwargs
+        ))
+
+    for name in signature.kwargs:
+        typedef = signature.typehints.get(name, str)
+        if is_context(typedef):
+            continue
+        kwargs   = flags_default.get(name) or {}
+        about    = kwargs.pop('about', None) or doc.params.get(name) or ''
+        required = kwargs.pop('required', None) or (name not in signature.defaults)
+        flags.append(Flag[typedef](
+            name=name,
+            about=about,
+            default=signature.defaults.get(name, None),
+            required=required,
+            **kwargs
+        ))
+
+    if signature.arg_splat is not None:
+        name    = signature.arg_splat
+        typedef = signature.typehints.get(name, str)
+        kwargs  = args_default.get(name) or {}
+        about   = kwargs.pop('about', None) or doc.params.get(name) or ''
+        args.append(Arg[typedef](
+            name=name,
+            about=about,
+            default=signature.defaults.get(name, None),
             repeat=True,
-            required=False,
+            **kwargs
         ))
     return cls(
         name=callable.__name__,

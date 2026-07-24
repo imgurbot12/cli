@@ -152,11 +152,19 @@ class Parser:
         self.help     = help or Help()
         self.command  = command
         self.complete = complete or autocomplete_cmd()
+        self._init()
 
-        if self.complete not in self.command.commands:
-            self.command.commands.append(self.complete)
+    def _init(self):
+        """
+        """
+        command = self.command
         self.help.apply_helpers(command)
-        self.command.validate()
+        if self.complete not in command.commands:
+            command.commands.append(self.complete)
+            #NOTE: dont force autocomplete command usage
+            if len(command.commands) == 1:
+                command.invoke_without_command = True
+        command.validate()
 
     def validate_arg(self,
         ctx: ParseCtx, arg: Arg, value: ArgValue, error_flags: bool) -> Any:

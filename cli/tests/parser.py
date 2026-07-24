@@ -5,19 +5,21 @@ from pathlib import Path
 from typing import Iterable, List, Tuple, Type, Union, cast
 from unittest import TestCase
 
-from ._apps import APP_V1
+from ._apps import APP_V1, APP_V2
 from .. import Arg, Command, Flag, Parser, ParsedCmd
 from ..parser import Invalid, MissingValue, ParseCtx, CommandRequired, Missing, Unexpected
 
 #** Variables **#
-__all__ = ['ParserTests']
+__all__ = ['ParserTestsV1', 'ParserTestsV2']
 
 DEFAULT_OPTS = {'user': 'root', 'log': 10, 'debug': False, 'repeat': None, 'help': False}
 
 #** Classes **#
 
 class ParserTests(TestCase):
-    app: Command = APP_V1
+    __test__ = False
+
+    app: Command
 
     def parse(self, args: List[str]) -> ParsedCmd:
         """
@@ -276,3 +278,10 @@ class ParserTests(TestCase):
                 self.assertDictEqual(do.commands['run'].flags, {'km': False})
                 self.assertDictEqual(do.commands['run'].commands, {})
 
+class ParserTestsV1(ParserTests):
+    __test__ = True
+    app: Command = APP_V1
+
+class ParserTestsV2(ParserTests):
+    __test__ = True
+    app: Command = APP_V2

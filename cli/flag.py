@@ -47,7 +47,8 @@ def parse_short(name: str) -> Tuple[str, Optional[Short]]:
 class Flag(Generic[T]):
     """
     """
-    type: Type[T]
+    type:      Type[T]
+    suggestor: OptSuggest
 
     def __init__(self,
         name:       str,
@@ -65,16 +66,25 @@ class Flag(Generic[T]):
         name, name_short = parse_short(name)
         self.name        = name
         self.about       = about or ''
+        self.default     = default
         self.required    = required
         self.repeat      = repeat
         self.short       = short or name_short
         self.long        = long or name
         self.hidden      = hidden
-        self.validators  = validators or []
-        self.type        = get_type(self, type)
-        self.suggestor   = get_suggestor(self.type, suggestor)
-        self.validators  = get_validator(self.type, self.validators)
-        self.default     = flag_default(self.type, default)
+        self.validators  = validators.copy() if validators else []
+        self.suggestor   = suggestor
+        self._set_type(type)
+
+    def _set_type(self, typedef: Optional[Type]):
+        """
+        """
+        newtype, meta   = get_type(self, typedef)
+        self.type       = newtype
+        self.repeat     = self.repeat or meta.repeat
+        self.suggestor  = get_suggestor(self.type, self.suggestor)
+        self.validators = get_validator(self.type, self.validators)
+        self.default    = flag_default(self.type, self.default)
 
     def __repr__(self) -> str:
         attrs = {'name': self.name, 'short': self.short, 'long': self.long}
