@@ -210,7 +210,7 @@ class Parser:
         cmdargs: List[Arg], args: List[str]) -> Dict[str, Any]:
         """
         """
-        values      = {}
+        values      = {} #type: Dict[str, Any]
         cmdargs     = cmdargs.copy()
         error_flags = True
         while cmdargs and args:
@@ -220,13 +220,13 @@ class Parser:
                 error_flags = False
                 continue
 
-            value = self.validate_arg(ctx, cmdarg, value, error_flags)
+            val = self.validate_arg(ctx, cmdarg, value, error_flags)
             if cmdarg.repeat:
-                value = value if isinstance(value, (list, tuple, set)) else [value]
+                val = val if isinstance(val, (list, tuple, set)) else [val]
                 values.setdefault(cmdarg.name, [])
-                values[cmdarg.name].extend(value)
+                values[cmdarg.name].extend(val)
             else:
-                values[cmdarg.name] = value
+                values[cmdarg.name] = val
                 cmdargs.pop(0)
 
         remaining = []
@@ -304,10 +304,10 @@ class Parser:
             cmd  = self.command
             path = args[idx+1:]
             for item in path:
-                variants = {v:c for c in cmd.commands for v in c.variants()}
-                if item not in variants:
+                vars = {v:c for c in cmd.commands for v in c.variants()}
+                if item not in vars:
                     raise InvalidCommand(ctx, item)
-                cmd = variants[item]
+                cmd = vars[item]
             raise HelpError(ctx, cmd)
 
     def parse(self, args: List[str]) -> ParsedCmd:

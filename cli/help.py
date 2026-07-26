@@ -74,7 +74,7 @@ class Help:
         for a, b in zip(r1, r2):
             line = self.indent + a
             if (len(prefix) + len(line) + len(b)) > threshold:
-                buffer = None
+                buffer = None #type: ignore[assignment]
                 break
             buffer = len(line) if buffer < len(line) else buffer
 

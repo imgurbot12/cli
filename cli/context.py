@@ -77,6 +77,11 @@ class Context:
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
         'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help', 'standalone_mode')
 
+    extra:   Dict[str, Any]
+    stdout:  AnyIO
+    stderr:  AnyIO
+    styling: Styling
+
     def __init__(self,
         parsed:  'ParsedCmd',
         parent:  Optional['Context']      = None,
@@ -109,8 +114,8 @@ class Context:
     def path(self) -> List['Command']:
         """
         """
-        path = []
-        ctx  = self
+        path: List[Command] = []
+        ctx:  Optional[Context] = self
         while ctx is not None:
             path.insert(0, ctx.command)
             ctx = ctx.parent if ctx else None

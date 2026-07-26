@@ -101,7 +101,8 @@ class Command:
         standalone_mode: bool = True,
         **kwargs: Unpack[RunKwargs]
     ):
-        return self.run(args, standalone_mode=standalone_mode, **kwargs)
+        return self.run(args, #type: ignore[call-overload]
+            standalone_mode=standalone_mode, **kwargs)
 
     def variants(self) -> List[str]:
         """
@@ -115,10 +116,10 @@ class Command:
 
         :return: dictionary of category names associated w/ sub-commands
         """
-        categories = {}
+        categories: Dict[str, List[Command]] = {}
         for cmd in self.commands:
             categories.setdefault(cmd.category, [])
-            categories[cmd.categories].append(cmd)
+            categories[cmd.category].append(cmd)
         return categories
 
     def visible_flags(self) -> Flags:

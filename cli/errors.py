@@ -69,7 +69,7 @@ class UsageError(CliError):
     def __init__(self, ctx: ParseCtx, *args):
         super().__init__(ctx, *args)
         if args and isinstance(args[0], str):
-            self.message = args
+            self.message = args[0]
 
 class InvalidCommand(UsageError):
     def __init__(self, ctx: ParseCtx, command: str):

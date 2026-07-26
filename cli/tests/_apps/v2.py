@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import User, Repeat
-from ... import Context, command, option
+from ... import Context, command, extra, option
 from ...validate import LogLevel
 
 #** Variables **#
@@ -47,22 +47,24 @@ def echo(*test: str, dry: bool = False, file: Optional[Path] = None):
 
 @v1.command
 @option('kill', short='k')
-def do(*, kill: bool = False):
+def do(ctx: Context, *, kill: bool = False):
     """
     do a specific action
 
     :param kill: end action with "and dies..."
     """
+    ctx.extra['extra'] = 'ayylmao'
     print('do!', kill)
 
 @do.command
-def run(dist1: Repeat, dist2: int = 42, *, km: bool = False):
+@extra('extra')
+def run(dist1: Repeat, dist2: int = 42, *, km: bool = False, extra: str):
     """
     run a given number of miles
 
     :param km: use kilometers rather than miles
     """
-    print('run', dist1, dist2, km)
+    print('run', dist1, dist2, km, extra)
 
 @do.command
 def fly(dist2: int, *, km: bool = False):

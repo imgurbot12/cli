@@ -189,7 +189,7 @@ class Suggestor:
 
         value      = args[-1] if args and partial else ''
         all_flags  = command.visible_flags()
-        flags      = (f for f in all_flags if f not in fmatched or f.repeat)
+        flags      = [f for f in all_flags if f not in fmatched or f.repeat]
         flags      = [f for f in flags if f.suggestor is not False]
         f_required = [f for f in flags if f.required]
         if f_required:

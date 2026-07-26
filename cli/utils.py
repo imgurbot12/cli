@@ -4,18 +4,30 @@ CLI Utility Functions
 from io import TextIOBase
 from collections import OrderedDict
 from typing import (
-    Any, Callable, List, Optional, Type, TypedDict, Union, cast, overload)
+    Any, Callable, List, Optional, Type, TypeVar, TypedDict, Union, cast, overload)
 from typing_extensions import Unpack
 
 from . import T, OptSuggest
-from .flag import Short, Flag
+from .flag import Short
 from .cmd import C, Action, Command
 from .context import AnyIO, get_current_context
 from .style import Color, Style, Styling, AnsiTermStyle
-from .wraps import ARG_ATTR, FLAG_ATTR, into_command
+from .wraps import ARG_ATTR, EXTRA_ATTR, FLAG_ATTR, into_command
 
 #** Variables **#
-__all__ = ['echo', 'style', 'secho', 'option', 'command', 'group']
+__all__ = [
+    'echo',
+    'style',
+    'secho',
+
+    'extra',
+    'argument',
+    'option',
+    'command',
+    'group'
+]
+
+Func = TypeVar('Func', bound=Callable)
 
 #** Classes **#
 
@@ -128,6 +140,40 @@ def secho(
         items.append(item)
     return echo(*items, file=file, err=err, join=join, end=end)
 
+def extra(name: str) -> Callable[[Func], Func]:
+    """
+    """
+    def wrapper(func: Func) -> Func:
+        extra = getattr(func, EXTRA_ATTR, None) or set()
+        extra.add(name)
+        setattr(func, EXTRA_ATTR, extra)
+        return func
+    return wrapper
+
+def argument(
+    name: str,
+    about:      Optional[str]                      = None,
+    validators: Optional[List[Callable[[Any], T]]] = None,
+    suggestor:  OptSuggest                         = None,
+    required:   Optional[bool]                     = None,
+) -> Callable[[Func], Func]:
+    """
+    """
+    arg = dict(
+        about=about,
+        validators=validators,
+        suggestor=suggestor,
+        required=required,
+    )
+    def wrapper(func: Func) -> Func:
+        args = getattr(func, ARG_ATTR, None) or OrderedDict()
+        if name in args:
+            raise RuntimeError(f'Arg: {name!r} already defined.')
+        args[name] = arg
+        setattr(func, ARG_ATTR, args)
+        return func
+    return wrapper
+
 def option(
     name:       str,
     about:      Optional[str]                      = None,
@@ -137,7 +183,7 @@ def option(
     validators: Optional[List[Callable[[Any], T]]] = None,
     suggestor:  OptSuggest                         = None,
     required:   bool                               = False,
-):
+) -> Callable[[Func], Func]:
     """
     """
     flag = dict(
@@ -149,7 +195,7 @@ def option(
         suggestor=suggestor,
         required=required,
     )
-    def wrapper(func: Callable) -> Callable:
+    def wrapper(func: Func) -> Func:
         """
         """
         flags = getattr(func, FLAG_ATTR, None) or OrderedDict()

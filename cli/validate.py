@@ -6,7 +6,7 @@ import re
 import logging
 from pathlib import Path
 from datetime import timedelta
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Type, Union
 from typing_extensions import Annotated
 
 from .suggest import Suggest
@@ -147,7 +147,7 @@ NewFile      = Annotated[Path, Validate[lambda f: parse_file(f, False)]]
 ExistingFile = Annotated[Path, Validate[lambda f: parse_file(f, True)]]
 
 #: default validators for specific datatypes
-DEFAULT_VALIDATORS = {
+DEFAULT_VALIDATORS: Dict[Type, ValidatorFunc] = {
     bool:      parse_bool,
     float:     parse_float,
     timedelta: parse_duration,

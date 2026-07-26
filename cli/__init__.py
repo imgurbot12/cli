@@ -19,6 +19,10 @@ from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 # - repeated command
 # - group / command tree (subcmd-required difference)
 
+#TODO: docs
+# - simple hello world
+# - `Context.extra` and pass via function args
+
 #DONE: suggestor unit-tests
 #DONE: controls on stripping/ignoring styling when writing to file instead of tty
 #DONE: help-page implementation (with colors)
@@ -29,6 +33,8 @@ __all__ = [
     'echo',
     'style',
     'secho',
+    'argument',
+    'extra',
     'option',
     'command',
     'group',
@@ -40,6 +46,7 @@ __all__ = [
     'Flag',
 
     'CliError',
+    'Extra',
     'Validate',
     'Suggest',
 
@@ -93,10 +100,11 @@ def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
     if suggest is not None:
         return suggest
     if get_origin(type) is not Annotated:
-        return
+        return None
     for arg in get_args(type):
         if isinstance(arg, Suggest):
             return arg.suggestor
+    return None
 
 def get_validator(type: Type,
     validators: List['ValidatorFunc']) -> List['ValidatorFunc']:
@@ -123,5 +131,6 @@ from .flag import Flag
 from .help import Help
 from .parser import Parser, ParsedCmd
 from .suggest import Suggest, Suggestor
-from .utils import echo, style, secho, option, command, group
+from .utils import echo, style, secho, argument, extra, option, command, group
 from .validate import DEFAULT_VALIDATORS, Validate, ValidatorFunc
+from .wraps import Extra

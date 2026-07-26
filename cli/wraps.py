@@ -2,18 +2,29 @@
 CLI Action Argument Construction Wrappers
 """
 import asyncio
-from collections import OrderedDict
 import inspect
 import functools
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Type, TypeVar
+from typing import (
+    Any, Callable, Dict, List, NamedTuple, Optional, Set, Type, TypeVar)
+from typing_extensions import Annotated, get_args, get_origin
 
-from . import T
 from .arg import Arg
 from .flag import Flag
 from .cmd import Action, AsyncAction, Command
 from .context import Context
 
 #** Variables **#
+__all__ = [
+    'Doc',
+    'Inspected',
+    'Extra',
+
+    'wrap_async',
+    'get_signature',
+    'parse_doc',
+    'into_command',
+    'wrap_ctx',
+]
 
 R = TypeVar('R')
 
@@ -25,6 +36,9 @@ ARG_ATTR = '__cli_arg'
 
 #: hidden attribute used to cache flag definitions
 FLAG_ATTR = '__cli_flags'
+
+#: hidden attribute used to cache extra definitions
+EXTRA_ATTR = '__cli_extra'
 
 #** Classes **#
 
@@ -39,6 +53,9 @@ class Inspected(NamedTuple):
     kw_splat:  Optional[str]
     defaults:  Dict[str, Any]
     typehints: Dict[str, Type]
+
+class Extra:
+    pass
 
 #** Functions **#
 
@@ -117,6 +134,13 @@ def is_context(typedef: Type) -> bool:
     """
     return inspect.isclass(typedef) and issubclass(typedef, Context)
 
+def is_extra(typedef: Type) -> bool:
+    """
+    check if the given typedef annotation is extra
+    """
+    return get_origin(typedef) is Annotated \
+        and any(isinstance(arg, Extra) for arg in get_args(typedef))
+
 def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     """
     convert function into a command definition using function doc/signature
@@ -129,33 +153,36 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
     signature     = get_signature(callable)
     args          = []
     flags         = []
-    args_default  = getattr(callable, ARG_ATTR, {})
-    flags_default = getattr(callable, FLAG_ATTR, {})
+    extra: Set[str] = getattr(callable, EXTRA_ATTR, set())
+    args_default    = getattr(callable, ARG_ATTR, {})
+    flags_default   = getattr(callable, FLAG_ATTR, {})
     for name in signature.args:
         typedef = signature.typehints.get(name, str)
-        if is_context(typedef):
+        if name in extra or is_context(typedef) or is_extra(typedef):
             continue
         kwargs = args_default.get(name) or {}
         about  = kwargs.pop('about', None) or doc.params.get(name) or ''
-        args.append(Arg[typedef](
+        args.append(Arg(
             name=name,
             about=about,
             default=signature.defaults.get(name, None),
+            type=typedef,
             **kwargs
         ))
 
     for name in signature.kwargs:
         typedef = signature.typehints.get(name, str)
-        if is_context(typedef):
+        if name in extra or is_context(typedef) or is_extra(typedef):
             continue
         kwargs   = flags_default.get(name) or {}
         about    = kwargs.pop('about', None) or doc.params.get(name) or ''
         required = kwargs.pop('required', None) or (name not in signature.defaults)
-        flags.append(Flag[typedef](
+        flags.append(Flag(
             name=name,
             about=about,
             default=signature.defaults.get(name, None),
             required=required,
+            type=typedef,
             **kwargs
         ))
 
@@ -164,10 +191,11 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
         typedef = signature.typehints.get(name, str)
         kwargs  = args_default.get(name) or {}
         about   = kwargs.pop('about', None) or doc.params.get(name) or ''
-        args.append(Arg[typedef](
+        args.append(Arg(
             name=name,
             about=about,
             default=signature.defaults.get(name, None),
+            type=typedef,
             repeat=True,
             **kwargs
         ))
@@ -205,7 +233,7 @@ def wrap_ctx(callable: Callable[..., R]) -> Callable[[Context], R]:
             used.add(kwarg)
             kwargs[kwarg] = value
         if signature.arg_splat is not None:
-            splat = ctx.get(signature.arg_splat, default=None)
+            splat: Optional[List] = ctx.get(signature.arg_splat, default=None)
             if splat is None:
                 splat = []
                 for key, value in ctx.args.items():
