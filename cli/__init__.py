@@ -3,12 +3,13 @@ Command-Line-Interface Parsing Library
 """
 from enum import Enum
 from typing import (
-    Callable, Iterable, List, Literal, NamedTuple, Optional, Tuple, Type, TypeVar, Union, cast)
+    Callable, Iterable, List, Literal, NamedTuple, Optional,
+    Tuple, Type, TypeVar, Union, cast)
 from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 
 #DONE: handle ValueError exceptions on data-type issues
-#TODO: functions:  cli.group/cli.context/cli.echo
-#TODO: decorators: cli.argument/cli.flag/cli.pass_context to override/enhance parsed details
+#DONE: functions:  cli.group/cli.context/cli.echo
+#DONE: decorators: cli.argument/cli.flag/cli.pass_context to override/enhance parsed details
 #TODO: errors should be more precisce -> double flag, extra arg, etc...
 #TODO: docstrings for all functions
 

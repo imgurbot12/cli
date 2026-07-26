@@ -1,7 +1,8 @@
 """
 Application Implementations for UnitTests
 """
-from typing import Annotated
+from typing_extensions import Annotated
+
 from ...suggest import Suggest
 
 #** Variables **#

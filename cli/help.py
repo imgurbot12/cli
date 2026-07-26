@@ -99,7 +99,7 @@ class Help:
             if isinstance(default, bool):
                 default = int(default)
             return f'{item.about} [default: {default}]'
-        return item.about or 'required argument'
+        return item.about or ''
 
     def arg_usage(self, ctx: 'ParseCtx', arg: Arg) -> str:
         """
@@ -141,7 +141,7 @@ class Help:
             if len(required) < len(flags):
                 usage.append('<OPTIONS>')
 
-        if cmd.commands:
+        if cmd.visible_commands():
             command = '[COMMAND]' if cmd.invoke_without_command else '<COMMAND>'
             usage.append(command)
         return self.space.join(usage)

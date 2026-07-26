@@ -85,7 +85,7 @@ class Context:
     def __init__(self,
         parsed:  'ParsedCmd',
         parent:  Optional['Context']      = None,
-        help:    Optional[Help]           = None,
+        help:    Optional['Help']         = None,
         stdout:  Optional[AnyIO]          = None,
         stderr:  Optional[AnyIO]          = None,
         suggest: Optional['SuggestorCLS'] = None,
@@ -128,7 +128,7 @@ class Context:
         commands = list(self.parsed.commands.keys())
         return commands if commands else None
 
-    def suggestor(self) -> Suggestor:
+    def suggestor(self) -> 'Suggestor':
         """
         """
         return self.suggest(self.path[0])
