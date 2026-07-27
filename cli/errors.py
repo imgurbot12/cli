@@ -1,5 +1,5 @@
 """
-
+CLI Parser/Runtime Exception Implementations
 """
 from typing import ClassVar, Dict, List, Optional, Union
 
@@ -26,10 +26,17 @@ __all__ = [
 #** Classes **#
 
 class Exit(RuntimeError):
+    """
+    Custom Exception for Early Exit of CLI Actions
+    """
+
     def __init__(self, exit_code: int = 0):
         self.exit_code = exit_code
 
 class CliError(Exception):
+    """
+    Baseclass for CLI Exceptions
+    """
     exit_code: ClassVar[int] = 1
 
     def __init__(self, ctx: ParseCtx, *args):
@@ -39,11 +46,13 @@ class CliError(Exception):
 
     def format_message(self, help: Help) -> str:
         """
+        format the error message as part of the help-display
         """
         return self.message
 
     def show(self, help: Optional[Help] = None) -> str:
         """
+        show the help-page associated with this error
         """
         help = help or Help()
         return help.styling.wrap_color('red', 'error:') \
@@ -53,6 +62,9 @@ class CliError(Exception):
             + help.err_suffix(self.ctx)
 
 class HelpError(CliError):
+    """
+    Internal Exception used when Help Command should be raised.
+    """
     exit_code: ClassVar[int] = 0
 
     def __init__(self, ctx: ParseCtx, command: Command):
@@ -65,7 +77,11 @@ class HelpError(CliError):
         return help.help(self.ctx, self.command)
 
 class UsageError(CliError):
+    """
+    Generic Usage Error Exception
+    """
     exit_code: ClassVar[int] = 2
+
     def __init__(self, ctx: ParseCtx, *args):
         super().__init__(ctx, *args)
         if args and isinstance(args[0], str):

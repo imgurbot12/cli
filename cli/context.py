@@ -73,6 +73,7 @@ class MISSING:
 
 class Context:
     """
+    CLI Command Action Runtime Context
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
         'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help', 'standalone_mode')
@@ -92,6 +93,16 @@ class Context:
         styling: Optional[Styling]        = None,
         standalone_mode: bool             = True,
     ):
+        """
+        :param parsed:          parsed command contents
+        :param parent:          parent context of parent action
+        :param help:            help formatter object
+        :param stdout:          standard output file
+        :param stderr:          standard error output file
+        :param suggest:         auto-complete suggestion handler type
+        :param styling:         format styling object
+        :param standalone_mode: label if actions are running in standalone
+        """
         self.parsed  = parsed
         self.command = parsed.source
         self.args    = parsed.args
@@ -106,13 +117,12 @@ class Context:
         self.standalone_mode = standalone_mode
 
     def __repr__(self) -> str:
-        """
-        """
         return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
 
     @property
     def path(self) -> List['Command']:
         """
+        retrieve heigharchical path of commands executed
         """
         path: List[Command] = []
         ctx:  Optional[Context] = self
@@ -124,22 +134,26 @@ class Context:
     @property
     def invoked_subcommands(self) -> Optional[List[str]]:
         """
+        retrieve list of subcommands to be invoked next
         """
         commands = list(self.parsed.commands.keys())
         return commands if commands else None
 
     def suggestor(self) -> 'Suggestor':
         """
+        generate auto-complete suggestor instance
         """
         return self.suggest(self.path[0])
 
     def exit(self, exit_code: int = 0):
         """
+        force exit command execution early
         """
         raise Exit(exit_code)
 
     def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
         """
+        retrieve a value from a dictionarry and validate its type if given
         """
         value = dict[name]
         if ctype is not None and not typecheck(value, ctype):
@@ -151,6 +165,13 @@ class Context:
     def get(self, name: str,
         ctype: Optional[Type[T]] = None, default: Any = MISSING) -> T:
         """
+        retrieve a value from the first relevant context and valdiate its type
+
+        heigharchy: arguments -> flags -> extra -> default
+
+        :param name:    name of value to retrieve
+        :param ctype:   type to validate
+        :param default: default value if value is missing
         """
         value = self.args.get(name, MISSING)
         value = self.flags.get(name, MISSING) if value is MISSING else value
@@ -168,21 +189,34 @@ class Context:
 
     def get_arg(self, name: str, ctype: Optional[Type[T]] = None) -> T:
         """
+        retrieve argument value of a specific name and validate type
+
+        :param name:  name of argument
+        :param ctype: type annotation/validation
         """
         return self._get(self.args, name, ctype)
 
     def get_flag(self, name: str, ctype: Type[T]) -> T:
         """
+        retrieve flag/option value of a specific name and validate type
+
+        :param name:  name of flag/option
+        :param ctype: type annotation/validation
         """
         return self._get(self.flags, name, ctype)
 
     def get_extra(self, name: str, ctype: Type[T]) -> T:
         """
+        retrieve extra value of a specific name and validate type
+
+        :param name:  name of extra value
+        :param ctype: type annotation/validation
         """
         return self._get(self.extra, name, ctype)
 
     def stack(self, parsed: 'ParsedCmd') -> 'Context':
         """
+        generate child context object using parsed context
         """
         context = self.__class__(
             parsed=parsed,

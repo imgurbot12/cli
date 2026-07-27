@@ -37,6 +37,7 @@ class RunKwargs(TypedDict, total=False):
 
 class Command:
     """
+    CLI Command Configuration Object
     """
     __slots__ = (
         'name', 'about', 'version', 'authors', 'category', 'hidden',
@@ -59,6 +60,19 @@ class Command:
         invoke_without_command: bool                = False,
     ):
         """
+        :param name:                   namme of command
+        :param about:                  description of command
+        :param version:                version of command
+        :param authors:                authors of command / program
+        :param category:               category linked to command
+        :param hidden:                 hide command if true
+        :param suggest:                allow inclusion for suggestion
+        :param args:                   configured command arguments
+        :param flags:                  configured command options/flags
+        :param commands:               configured sub-commands
+        :param aliases:                aliases of the command
+        :param action:                 function to call on command
+        :param invoke_without_command: allow command to run without subcommand
         """
         self.name                   = name
         self.about                  = about
@@ -106,6 +120,7 @@ class Command:
 
     def variants(self) -> List[str]:
         """
+        list of name and aliases of command
         """
         return [self.name, *self.aliases]
 
@@ -180,6 +195,13 @@ class Command:
         cls:      Optional[Type[C]]        = None,
     ) -> Union[Callable[[Action], 'Command'], C, 'Command']:
         """
+        subcommand function wrapper
+
+        :param name:     name of command
+        :param about:    description of command
+        :param category: category linked to command
+        :param hidden:   hide this command if true
+        :param cls:      command subclass type
         """
         cname = name if isinstance(name, str) else None
         def wrapper(action: Action) -> Command:
@@ -194,6 +216,7 @@ class Command:
 
     def _validate_args(self):
         """
+        validate arguments and their configuration in command
         """
         reserved = set()
         repeated = None
@@ -211,6 +234,7 @@ class Command:
 
     def _validate_flags(self):
         """
+        validate flags and their configuration in command
         """
         reserved = set()
         for n, flag in enumerate(self.flags, 0):
@@ -226,6 +250,7 @@ class Command:
 
     def _validate_commands(self):
         """
+        validate subcommands and their configuration in command
         """
         reserved = set()
         for n, cmd in enumerate(self.commands, 0):
@@ -241,6 +266,7 @@ class Command:
 
     def validate(self):
         """
+        validate this command and its configuration
         """
         self._validate_args()
         self._validate_flags()
@@ -253,6 +279,12 @@ class Command:
         **kwargs: Unpack[RunKwargs]
     ) -> 'ParsedCmd':
         """
+        parse the given arguments and return the parsed context object
+
+        :param args:            arguments to parse
+        :param standalone_mode: exit after completion if true
+        :param kwargs:          additional contextual arguments
+        :return:                parsed command structure
         """
         help   = kwargs.get('help') or Help()
         parser = kwargs.get('parser') or Parser
@@ -268,6 +300,7 @@ class Command:
 
     def _check_run(self, context: 'Context') -> bool:
         """
+        check if the next command action should run
         """
         is_group = len(self.commands) > 0
         if is_group:
@@ -277,6 +310,10 @@ class Command:
 
     def run_with(self, context: 'Context', action: Optional[SyncAction] = None):
         """
+        run this command with the specified context/action
+
+        :param context: command runtime context
+        :param action:  command action override
         """
         act = action or self.action
         if act is not None:
@@ -292,6 +329,10 @@ class Command:
     async def run_with_async(self,
         context: 'Context', action: Optional[AsyncAction] = None):
         """
+        run this command with the specified context/action asyncly
+
+        :param context: command runtime context
+        :param action:  command action override
         """
         act = action or self.action
         if act is not None:
@@ -327,6 +368,10 @@ class Command:
         **kwargs: Unpack[RunKwargs]
     ):
         """
+        parse the given arguments and run the relevant command actions
+
+        :param args:            arguments to parse
+        :param standalone_mode: exit after completion if true
         """
         code   = 0
         result = self.parse(args, standalone_mode=standalone_mode, **kwargs)
@@ -342,8 +387,12 @@ class Command:
             sys.exit(code)
 
     async def run_async(self,
-        args: RunArgs = None, **kwargs: Unpack[RunKwargs]):
+        args: RunArgs = None, **kwargs: Unpack[RunKwargs]) -> None:
         """
+        parse the given arguments and run the relevant command actions asyncly
+
+        :param args:            arguments to parse
+        :param standalone_mode: exit after completion if true
         """
         result = self.parse(args, standalone_mode=False, **kwargs)
         with new_context(result, standalone_mode=False, **kwargs) as context:

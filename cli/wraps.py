@@ -77,6 +77,7 @@ def wrap_async(action: Action) -> AsyncAction:
 @functools.lru_cache(maxsize=None)
 def get_signature(callable: Callable) -> Inspected:
     """
+    parse elements of function signature from the given callable
     """
     sig       = inspect.signature(callable)
     args      = []
@@ -105,6 +106,7 @@ def get_signature(callable: Callable) -> Inspected:
 @functools.lru_cache(maxsize=None)
 def parse_doc(callable: Callable):
     """
+    parse a function docstring into description elements of parameters/command
     """
     doc   = callable.__doc__ or ''
     about = []

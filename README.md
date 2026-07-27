@@ -180,7 +180,7 @@ async def foo():
 def bar():
     cli.echo('bar called!')
 
-run_async = False
+run_async = True
 if run_async:
     asyncio.run(group.run_async())
 else:

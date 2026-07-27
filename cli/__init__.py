@@ -10,8 +10,6 @@ from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 #DONE: handle ValueError exceptions on data-type issues
 #DONE: functions:  cli.group/cli.context/cli.echo
 #DONE: decorators: cli.argument/cli.flag/cli.pass_context to override/enhance parsed details
-#TODO: errors should be more precisce -> double flag, extra arg, etc...
-#TODO: docstrings for all functions
 
 #DONE: pass `Context` with annotation present or @cli.pass_context wrapper
 #DONE: moar unit-tests for parser
@@ -20,14 +18,21 @@ from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 # - repeated command
 # - group / command tree (subcmd-required difference)
 
-#TODO: docs
+#DONE: docs
 # - simple hello world
 # - `Context.extra` and pass via function args
 
 #DONE: suggestor unit-tests
 #DONE: controls on stripping/ignoring styling when writing to file instead of tty
 #DONE: help-page implementation (with colors)
+
+#DONE: docstrings for all functions
 #TODO: give indexing another shot (but count down rather than up)
+#TODO: errors should be more precisce -> double flag, extra arg, etc...
+
+#TODO: command categories does nothing
+#TODO: authors will never be displayed ever in help
+#TODO: version will never be displayed ever (maybe add version flag with support for more info?)
 
 #** Variables **#
 __all__ = [
@@ -72,6 +77,10 @@ class _Meta(NamedTuple):
 
 def get_type(self, ftype: Optional[Type[T]]) -> Tuple[Type[T], _Meta]:
     """
+    retrieve real type associated with arg/flag and update the relevant attrs
+
+    :param ftype: type annotation assignment
+    :return:      (true type, option metadata)
     """
     ftype = ftype or getattr(self, 'type', None)
     if ftype is not None:
@@ -97,6 +106,11 @@ def get_type(self, ftype: Optional[Type[T]]) -> Tuple[Type[T], _Meta]:
 
 def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
     """
+    get suggestor function or configuration based on type
+
+    :param type:    arg/flag type
+    :param suggest: suggestion setting
+    :return:        suggestion
     """
     if suggest is not None:
         return suggest
@@ -110,6 +124,11 @@ def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
 def get_validator(type: Type,
     validators: List['ValidatorFunc']) -> List['ValidatorFunc']:
     """
+    retrieve validators based on arg/flag configuration
+
+    :param type:       type assignment for arg/flag
+    :param validators: list of established validators
+    :return:           complete list of validators
     """
     validator = DEFAULT_VALIDATORS.get(type)
     if validator is not None:

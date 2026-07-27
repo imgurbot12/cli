@@ -22,6 +22,10 @@ FlagValues = Union[List[Optional[str]], Type[MISSING]]
 
 def index_flags(flags: List[Flag], args: List[str]) -> List[Tuple[int, Flag]]:
     """
+    retrieve list of indexes for each flag found in the arguments
+
+    :param flags: list of flags to find indexes of
+    :param args:  list of arguments to parse flags from
     """
     flags   = flags.copy()
     indexes = []
@@ -40,6 +44,10 @@ def index_flags(flags: List[Flag], args: List[str]) -> List[Tuple[int, Flag]]:
 def index_commands(
     commands: List[Command], args: List[str]) -> List[Tuple[int, Command]]:
     """
+    retrieve list of indexes for each command found in the arguments
+
+    :param commands: list of commands to find indexes of
+    :param args:     list of arguments to parse commands from
     """
     commands = commands.copy()
     indexes  = []
@@ -57,6 +65,9 @@ def index_commands(
 #** Classes **#
 
 class ParsedCmd(NamedTuple):
+    """
+    Parse Completion Command Details
+    """
     source:   Command
     args:     Dict[str, Any]
     commands: Dict[str, 'ParsedCmd']
@@ -64,6 +75,7 @@ class ParsedCmd(NamedTuple):
 
 class ParseCtx:
     """
+    Parsing shared context object
     """
     __slots__ = ('path', 'missing', 'missing_v', 'invalid', 'unexpected')
 
@@ -81,23 +93,30 @@ class ParseCtx:
         self.unexpected = []
 
     def __repr__(self) -> str:
-        path = [c.name for c in self.path]
-        return f'Context(path={path})'
+        return f'Context(path={[c.name for c in self.path]})'
 
     @property
     def command(self) -> Command:
         """
+        retrieve latest command in parsing stack
         """
         return self.path[-1]
 
     def stack(self, command: Command) -> 'ParseCtx':
         """
+        generate new child context with next command
         """
         return self.__class__([*self.path, command])
 
     def splice_args(self, array: List[T],
         index: int, length: Optional[int] = None) -> List[T]:
         """
+        splice a subsection of an array and remove it from the existing one
+
+        :param array:  array to splice entries from
+        :param index:  index to begin splicing from
+        :param length: length of items to splice (defaults to end)
+        :return:       subsection spliced out
         """
         end    = (index + length) if length is not None else len(array)
         splice = array[index:end]
@@ -106,26 +125,31 @@ class ParseCtx:
 
     def add_missing(self, *missing: Union[Arg, Flag, Command]):
         """
+        log a missing argument/flag/command during parsing
         """
         self.missing.extend(missing)
 
     def add_missing_value(self, *missing: Flag):
         """
+        log a missing flag value during parsing
         """
         self.missing_v.extend(missing)
 
     def add_invalid(self, invalid: Union[Arg, Flag], value: str):
         """
+        log an invalid argument/flag value during parsing
         """
         self.invalid[invalid] = value
 
     def add_unexpected(self, *unexpected: str):
         """
+        log an unexpected argument during parsing
         """
         self.unexpected.extend(unexpected)
 
     def finalize(self):
         """
+        raise an exception if any items were logged during parsing
         """
         if self.unexpected:
             raise Unexpected(self, self.unexpected)
@@ -141,6 +165,7 @@ class ParseCtx:
 
 class Parser:
     """
+    CLI Raw Argument Parser Implementation
     """
     __slots__ = ('command', 'complete', 'help')
 
@@ -149,6 +174,11 @@ class Parser:
         help:     Optional[Help]    = None,
         complete: Optional[Command] = None,
     ):
+        """
+        :param command:  command definition to parse from
+        :param help:     help-page generator
+        :param complete: auto-completion command (if any)
+        """
         self.help     = help or Help()
         self.command  = command
         self.complete = complete or autocomplete_cmd()
@@ -156,6 +186,7 @@ class Parser:
 
     def _init(self):
         """
+        append help and auto-complete flags/commands
         """
         command = self.command
         self.help.apply_helpers(command)
@@ -169,6 +200,12 @@ class Parser:
     def validate_arg(self,
         ctx: ParseCtx, arg: Arg, value: ArgValue, error_flags: bool) -> Any:
         """
+        validate the given value matches an arguments configuration
+
+        :param ctx:         parsing context
+        :param arg:         command argument definition
+        :param value:       value to parse
+        :param error_flags: raise an exception on flag prefix if true
         """
         if value is MISSING:
             return ctx.add_missing(arg) if arg.required else arg.default
@@ -185,6 +222,11 @@ class Parser:
 
     def validate_flag(self, ctx: ParseCtx, flag: Flag, values: FlagValues) -> Any:
         """
+        validate the given value matches a flags configuration
+
+        :param ctx:    parsing context
+        :param flag:   command flag/option definition
+        :param values: values assigned to flag
         """
         if values is MISSING:
             return ctx.add_missing(flag) if flag.required else flag.default
@@ -209,6 +251,12 @@ class Parser:
     def split_args(self, ctx: ParseCtx,
         cmdargs: List[Arg], args: List[str]) -> Dict[str, Any]:
         """
+        split command arguments from the raw argument list
+
+        :param ctx:     parsing context
+        :param cmdargs: command arguments to parse and validate against
+        :param args:    raw arguments to parse from
+        :return:        map of parsed/validated argument values
         """
         values      = {} #type: Dict[str, Any]
         cmdargs     = cmdargs.copy()
@@ -246,6 +294,12 @@ class Parser:
     def split_flags(self, ctx: ParseCtx,
         flags: List[Flag], args: List[str]) -> Dict[str, Any]:
         """
+        split flags from the raw argument list
+
+        :param ctx:   parsing context
+        :param flags: command flags to parse and validate against
+        :param args:  raw arguments to parse from
+        :return:      map of parsed/validated flag values
         """
         indexes = index_flags(flags, args)
 
@@ -268,6 +322,12 @@ class Parser:
     def split_commands(self, ctx: ParseCtx, commands: List[Command],
         args: List[str]) -> Dict[str, ParsedCmd]:
         """
+        split sub-commands from the raw argument list
+
+        :param ctx:      parsing contxt
+        :param commands: subcommands to parse and validate against
+        :param args:     raw arguments to parse from
+        :return:         map of parsed/validated commands
         """
         indexes = index_commands(commands, args)
 
@@ -291,6 +351,10 @@ class Parser:
 
     def split_help(self, ctx: ParseCtx, args: List[str]):
         """
+        check for the presence of the help command/flag and raise error
+
+        :param ctx:  parsing context
+        :param args: raw arguments to compare against
         """
         for variant in self.help.flag.variants():
             if variant in args:
@@ -312,6 +376,10 @@ class Parser:
 
     def parse(self, args: List[str]) -> ParsedCmd:
         """
+        parse the specified arguments against the command defintion
+
+        :param args: raw arguments to parse from
+        :return:     parsed command values
         """
         args     = args.copy()
         nargs    = len(args)

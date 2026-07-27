@@ -127,6 +127,13 @@ def parse_file(file: str, exists: Optional[bool] = None) -> Path:
 #** Classes **#
 
 class Validate:
+    """
+    ValidatorFunc Annotation Helper
+
+    ```python
+    Test = Annotated[str, Validate[my_validator_func]]
+    ```
+    """
     __slots__ = ('validator', )
 
     def __init__(self, validator: ValidatorFunc):

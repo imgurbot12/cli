@@ -14,6 +14,7 @@ Args = List['Arg']
 
 class Arg(Generic[T]):
     """
+    Command Argument Configuration Setting
     """
     type:      Type[T]
     suggestor: OptSuggest
@@ -28,6 +29,16 @@ class Arg(Generic[T]):
         suggestor:  OptSuggest                         = None,
         type:       Optional[Type[T]]                  = None,
     ):
+        """
+        :param name:       name of argument
+        :param about:      description of argument
+        :param default:    default value assigned to argument
+        :param required:   label if argument is required during parsing
+        :param repeat:     allow argument to be repeated
+        :param validators: validators used to process argument value
+        :param suggestor:  argument auto-complete suggestion function
+        :param type:       argument type assignment
+        """
         self.name       = name
         self.about      = about
         self.default    = default
@@ -39,6 +50,7 @@ class Arg(Generic[T]):
 
     def _set_type(self, typedef: Optional[Type]):
         """
+        type assignment and all related attributes that pull from type
         """
         newtype, meta   = get_type(self, typedef)
         self.type       = newtype

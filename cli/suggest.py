@@ -29,6 +29,7 @@ def empty():
 
 def _action(ctx: Context):
     """
+    default auto-complete command action
     """
     suggestor = ctx.suggestor()
     pos       = ctx.get_arg('pos', int)
@@ -41,6 +42,7 @@ def _action(ctx: Context):
 @functools.lru_cache()
 def autocomplete_cmd() -> Command:
     """
+    default auto-complete hidden command definition
     """
     return Command(
         name='__autocomplete',
@@ -52,6 +54,10 @@ def autocomplete_cmd() -> Command:
 
 def suggest_options(options: List[str], value: str) -> Hints:
     """
+    helper function to suggest items from a list based on the value
+
+    :param options: options to recommend against
+    :param value:   current value used to generate suggestions
     """
     if not value:
         yield from options
@@ -63,6 +69,10 @@ def suggest_options(options: List[str], value: str) -> Hints:
 
 def suggest_static(s: Static) -> SuggestFunc:
     """
+    generate suggestor based on a static list of items
+
+    :param s: list of static items to suggest against
+    :return:  static suggestion function
     """
     vals    = list(s.keys()) if isinstance(s, Mapping) else list(s)
     options = [str(v) for v in vals]
@@ -73,6 +83,13 @@ def suggest_static(s: Static) -> SuggestFunc:
 #** Classes **#
 
 class Suggest:
+    """
+    Suggestion Annotation-Helper Type
+
+    ```python
+    Test = Annotated[str, Suggest[my_suggest_function]]
+    ```
+    """
     __slots__ = ('suggestor', )
 
     def __init__(self, suggestor: SuggestFunc):
@@ -85,6 +102,7 @@ class Suggest:
 
 class Suggestor:
     """
+    Auto-Complete Suggestion Generator Implementation
     """
     __slots__ = ('command', )
 
@@ -93,6 +111,7 @@ class Suggestor:
 
     def split_commands(self, args: List[str]) -> Command:
         """
+        find last valid command in raw arguments
         """
         command = self.command
         while args:
@@ -106,6 +125,11 @@ class Suggestor:
     def split_flags(self, flags: List[Flag],
         args: List[str]) -> Tuple[Optional[Flag], List[Flag]]:
         """
+        find last valid flag in raw arguments (if present)
+
+        :param flags: list of flags to compare against
+        :param args:  raw arguments to parse
+        :return:      (last matched-flag, list of all matched-flags)
         """
         indexes = index_flags(flags, args)
         if not indexes:
@@ -119,6 +143,11 @@ class Suggestor:
     def split_args(self,
         cmdargs: List[Arg], args: List[str], partial: bool) -> Optional[Arg]:
         """
+        find last valid argument in raw arguments (if present)
+
+        :param cmdargs: list of command arguments to compare against
+        :param args:    raw arguments to parse
+        :param partial: status of cursor (either partial string or new)
         """
         limit   = 1 if partial else 0
         cmdargs = cmdargs.copy()
@@ -137,11 +166,19 @@ class Suggestor:
 
     def suggest_options(self, options: List[str], value: str) -> Hints:
         """
+        helper function to suggest items from a list based on the value
+
+        :param options: options to recommend against
+        :param value:   current value used to generate suggestions
         """
         return suggest_options(options, value)
 
     def suggest_source(self, source: Union[Arg, Flag], value: str) -> Hints:
         """
+        generate suggestions from the given source argument/flag
+
+        :param source: source of suggestions
+        :param value:  value used to generate suggestions from
         """
         results   = []
         suggestor = source.suggestor
@@ -205,5 +242,10 @@ class Suggestor:
 
     def suggest_list(self, args: List[str], partial: bool = False) -> List[str]:
         """
+        Build suggestions based on latest relevant argument in args
+
+        :param args:    list of arguments from command-line
+        :param partial: declaration if last argument was partial or complete
+        :return:        list of complete suggestions
         """
         return list(self.suggest(args, partial))

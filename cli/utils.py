@@ -2,9 +2,11 @@
 CLI Utility Functions
 """
 from io import TextIOBase
+from itertools import cycle
 from collections import OrderedDict
 from typing import (
-    Any, Callable, List, Optional, Type, TypeVar, TypedDict, Union, cast, overload)
+    Any, Callable, List, Literal, Optional, Type,
+    TypeVar, TypedDict, Union, cast, overload)
 from typing_extensions import Unpack
 
 from . import T, OptSuggest
@@ -29,10 +31,20 @@ __all__ = [
 
 Func = TypeVar('Func', bound=Callable)
 
+RAINBOW = [
+    (255, 0,   0),   # Red
+    (255, 127, 0),   # Orange
+    (255, 255, 0),   # Yellow
+    (0,   255, 0),   # Green
+    (0,   0,   255), # Blue
+    (75,  0,   130), # Indigo
+    (148, 0,   211), # Violet
+]
+
 #** Classes **#
 
 class StyleKwargs(TypedDict, total=False):
-    color:     Color
+    color:     Union[Color, Literal['rainbow', 'party']]
     bold:      bool
     dim:       bool
     underline: bool
@@ -98,6 +110,10 @@ def echo(
 
 def style(text: Any, **kwargs: Unpack[StyleKwargs]) -> str:
     """
+    add styling based on current command configuration to the given string
+
+    :param text:   text content to style
+    :param kwargs: styling to add to the text
     """
     text    = text if isinstance(text, str) else str(text)
     styling = kwargs.pop('styling', None)
@@ -116,7 +132,16 @@ def style(text: Any, **kwargs: Unpack[StyleKwargs]) -> str:
         if reset and apply is True:
             stop.append(styling.reset_style(style))
 
-    text = text if color is None else styling.wrap_color(color, text)
+    if color is not None:
+        if color == 'rainbow' or color == 'party':
+            text = ' '.join(
+                styling.wrap_color(color, sec)
+                for sec, color in zip(text.split(' '), cycle(RAINBOW)))
+            if color == 'party':
+                text = styling.wrap_style('blink', text)
+        else:
+            text = styling.wrap_color(color, text)
+
     start.append(text)
     start.extend(stop)
     return ''.join(start)
@@ -130,6 +155,13 @@ def secho(
     **kwargs: Unpack[StyleKwargs],
 ):
     """
+    styling a string according to the confgiured settings and echo
+
+    Acts as a simpler replacement for:
+
+    ```python
+    cli.echo(cli.style('hello world', color='blink'))
+    ```
     """
     file    = _get_file(file, err)
     is_atty = file.isatty()
@@ -142,6 +174,7 @@ def secho(
 
 def extra(name: str) -> Callable[[Func], Func]:
     """
+    function decorator used to mark a parameter as extra
     """
     def wrapper(func: Func) -> Func:
         extra = getattr(func, EXTRA_ATTR, None) or set()
@@ -158,6 +191,10 @@ def argument(
     required:   Optional[bool]                     = None,
 ) -> Callable[[Func], Func]:
     """
+    Function decorator used to mark a parameter as an argument
+
+    It also allows additional specification of attributes otherwise
+    unable to be derived.
     """
     arg = dict(
         about=about,
@@ -185,6 +222,10 @@ def option(
     required:   bool                               = False,
 ) -> Callable[[Func], Func]:
     """
+    Function decorator used to mark a parameter as an option/flag
+
+    It also allows addiitonal specification of attributes otherwise
+    unable to be derived.
     """
     flag = dict(
         about=about,

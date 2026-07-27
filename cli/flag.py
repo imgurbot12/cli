@@ -2,7 +2,7 @@
 CLI Flag Implementation
 """
 from typing import (
-    Any, Callable, Generic, List, Literal, Optional, Tuple, Type, Union,
+    Any, Callable, Generic, List, Literal, Optional, Tuple, Type,
     cast, get_args)
 
 from . import T, OptSuggest, get_type, get_suggestor, get_validator
@@ -46,6 +46,7 @@ def parse_short(name: str) -> Tuple[str, Optional[Short]]:
 
 class Flag(Generic[T]):
     """
+    Command Flag/Option Configuration Setting
     """
     type:      Type[T]
     suggestor: OptSuggest
@@ -63,6 +64,19 @@ class Flag(Generic[T]):
         suggestor:  OptSuggest                         = None,
         type:       Optional[Type[T]]                  = None,
     ):
+        """
+        :param name:       name of flag
+        :param about:      description of flag
+        :param default:    default value assigned to flag
+        :param required:   label if flag is required during parsing
+        :param repeat:     allow flag to be repeated
+        :param short:      flag short variant
+        :param long:       flag long variant
+        :param hidden:     hide flag in help if true
+        :param validators: validators used to process flag value
+        :param suggestor:  flag auto-complete suggestion function
+        :param type:       flag type assignment
+        """
         name, name_short = parse_short(name)
         self.name        = name
         self.about       = about or ''
@@ -78,6 +92,7 @@ class Flag(Generic[T]):
 
     def _set_type(self, typedef: Optional[Type]):
         """
+        type assignment and all related attributes that pull from type
         """
         newtype, meta   = get_type(self, typedef)
         self.type       = newtype
@@ -100,11 +115,13 @@ class Flag(Generic[T]):
 
     def _requires_value(self) -> bool:
         """
+        return if flag requires a value or not based on type
         """
         return self.type is not bool
 
     def variants(self) -> List[str]:
         """
+        short and long flag variants of this flag
         """
         names = [f'--{self.long}']
         if self.short is not None:
