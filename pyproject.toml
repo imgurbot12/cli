@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cli3"
+version = "2.0.0"
+requires-python = ">=3.8"
+dependencies = [
+    'typing_extensions>=4.7.1',
+]
+authors = [
+    {name = "Andrew C Scott", email = "imgurbot12@gmail.com"},
+]
+description = "Highly configurable, dynamic, fast and easy command-line builder."
+readme = {file = "README.md", content-type = "text/markdown"}
+license = { file = 'LICENSE' }
+keywords = ["cli", "command", "commandline"]
+classifiers = [
+    "Typing :: Typed",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
+]
+
+[project.urls]
+Repository = "https://github.com/imgurbot12/cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"pydns" = ["py.typed"]

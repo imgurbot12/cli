@@ -1,3 +1,1 @@
-jinja2>=3.1.2
-pyderive3>=0.0.6
-typing_extensions>=4.7.1
+typing_extensions==4.16.0
