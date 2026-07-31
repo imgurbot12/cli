@@ -55,6 +55,7 @@ def new_context(
     """
     start new context object stack for the current cli job
     """
+    close   = kwargs.get('loop') is None
     context = Context(parsed, **kwargs)
     token   = context_stack.set([context])
     try:
@@ -64,6 +65,8 @@ def new_context(
         context.close(e.__class__, e, e.__traceback__)
     finally:
         context_stack.reset(token)
+        if close:
+            context.loop.close()
 
 @contextlib.asynccontextmanager
 async def new_context_async(

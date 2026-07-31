@@ -1,12 +1,11 @@
 """
 CLI Command Implementation
 """
-import sys
-import inspect
 import asyncio
+import sys
 from typing import (
-    Any, Awaitable, Callable, Coroutine, Dict, List, Literal, Optional, Type,
-    TypeVar, Union, cast, overload)
+    Any, Awaitable, Callable, Dict, List, Literal, Optional, Type,
+    TypeVar, Union, overload)
 from typing_extensions import NoReturn, TypedDict, Unpack
 
 from .arg import Args
@@ -35,6 +34,7 @@ class RunKwargs(TypedDict, total=False):
     suggest: 'SuggestorCLS'
     styling: Styling
     extra:   Dict[str, Any]
+    loop:    asyncio.AbstractEventLoop
 
 class Command:
     """
