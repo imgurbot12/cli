@@ -5,7 +5,7 @@ import sys
 import inspect
 import asyncio
 from typing import (
-    Awaitable, Callable, Coroutine, Dict, List, Literal, Optional, Type,
+    Any, Awaitable, Callable, Coroutine, Dict, List, Literal, Optional, Type,
     TypeVar, Union, cast, overload)
 from typing_extensions import NoReturn, TypedDict, Unpack
 
@@ -34,6 +34,7 @@ class RunKwargs(TypedDict, total=False):
     stderr:  'AnyIO'
     suggest: 'SuggestorCLS'
     styling: Styling
+    extra:   Dict[str, Any]
 
 class Command:
     """

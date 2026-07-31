@@ -91,6 +91,7 @@ class Context:
         stderr:  Optional[AnyIO]          = None,
         suggest: Optional['SuggestorCLS'] = None,
         styling: Optional[Styling]        = None,
+        extra:   Optional[Dict[str, Any]] = None,
         standalone_mode: bool             = True,
     ):
         """
@@ -101,6 +102,7 @@ class Context:
         :param stderr:          standard error output file
         :param suggest:         auto-complete suggestion handler type
         :param styling:         format styling object
+        :param extra:           extra data
         :param standalone_mode: label if actions are running in standalone
         """
         self.parsed  = parsed
@@ -108,7 +110,7 @@ class Context:
         self.args    = parsed.args
         self.flags   = parsed.flags
         self.parent  = parent
-        self.extra   = parent.extra if parent else {}
+        self.extra   = extra or (parent.extra if parent else {})
         self.stdout  = stdout or sys.stdout
         self.stderr  = stderr or sys.stderr
         self.suggest = suggest or Suggestor
