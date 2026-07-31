@@ -104,7 +104,7 @@ def get_type(self, ftype: Optional[Type[T]]) -> Tuple[Type[T], _Meta]:
                 return hints['return']
     return cast(Type, str), _Meta()
 
-def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
+def get_suggestor(typedef: Type, suggest: OptSuggest) -> OptSuggest:
     """
     get suggestor function or configuration based on type
 
@@ -114,11 +114,12 @@ def get_suggestor(type: Type, suggest: OptSuggest) -> OptSuggest:
     """
     if suggest is not None:
         return suggest
-    if get_origin(type) is not Annotated:
-        return None
-    for arg in get_args(type):
-        if isinstance(arg, Suggest):
-            return arg.suggestor
+    if get_origin(typedef) is Annotated:
+        for arg in get_args(typedef):
+            if isinstance(arg, Suggest):
+                return arg.suggestor
+    if issubclass(typedef, Enum):
+        return suggest_static([opt.value for opt in typedef])
     return None
 
 def get_validator(type: Type,
@@ -150,7 +151,7 @@ from .errors import CliError
 from .flag import Flag
 from .help import Help
 from .parser import Parser, ParsedCmd
-from .suggest import Suggest, Suggestor
+from .suggest import Suggest, Suggestor, suggest_static
 from .utils import echo, style, secho, argument, extra, option, command, group
 from .validate import DEFAULT_VALIDATORS, Validate, ValidatorFunc
 from .wraps import Extra

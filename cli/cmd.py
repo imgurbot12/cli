@@ -321,8 +321,7 @@ class Command:
             if self._check_run(context):
                 func = wrap_ctx(act)
                 co   = func(context)
-                if inspect.isawaitable(co):
-                    asyncio.run(cast(Coroutine[None, None, None], co))
+                call_async(co, loop=context.loop)
         for parsed in context.parsed.commands.values():
             context = context.stack(parsed)
             context.command.run_with(context)
@@ -396,14 +395,15 @@ class Command:
         :param standalone_mode: exit after completion if true
         """
         result = self.parse(args, standalone_mode=False, **kwargs)
-        with new_context(result, standalone_mode=False, **kwargs) as context:
+        async with new_context_async(result,
+            standalone_mode=False, **kwargs) as context:
             await self.run_with_async(context)
 
 #** Imports **#
-from .context import AnyIO, Context, new_context
+from .context import AnyIO, Context, new_context, new_context_async
 from .errors import CliError, Exit
 from .help import Help
 from .parser import Parser, ParsedCmd
 from .suggest import SuggestorCLS
-from .wraps import into_command, wrap_ctx, wrap_async
+from .wraps import call_async, into_command, wrap_ctx, wrap_async
 from .utils import echo

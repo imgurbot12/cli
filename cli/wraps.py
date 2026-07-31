@@ -4,13 +4,16 @@ CLI Action Argument Construction Wrappers
 import asyncio
 import inspect
 import functools
+import contextvars
 from typing import (
-    Any, Callable, Dict, List, NamedTuple, Optional, Set, Type, TypeVar)
-from typing_extensions import Annotated, get_args, get_origin
+    Any, Awaitable, Callable, Dict, List, NamedTuple, Optional,
+    Set, Type, TypeVar, Union, cast)
+from typing_extensions import Annotated, ParamSpec, get_args, get_origin
 
+from . import T
 from .arg import Arg
 from .flag import Flag
-from .cmd import Action, AsyncAction, Command
+from .cmd import Command
 from .context import Context
 
 #** Variables **#
@@ -20,12 +23,14 @@ __all__ = [
     'Extra',
 
     'wrap_async',
+    'call_async',
     'get_signature',
     'parse_doc',
     'into_command',
     'wrap_ctx',
 ]
 
+P = ParamSpec('P')
 R = TypeVar('R')
 
 #: hidden attribute tied to context wrapper
@@ -59,7 +64,17 @@ class Extra:
 
 #** Functions **#
 
-def wrap_async(action: Action) -> AsyncAction:
+#NOTE: backport of `asyncio.to_thread` for python 3.8
+async def to_thread_manual(func: Callable[..., T], /, *args, **kwargs) -> T:
+    loop      = asyncio.get_running_loop()
+    ctx       = contextvars.copy_context()
+    func_call = functools.partial(ctx.run, func, *args, **kwargs)
+    return await loop.run_in_executor(None, func_call)
+to_thread = getattr(asyncio, 'to_thread', to_thread_manual)
+
+def wrap_async(
+    action: Union[Callable[P, Awaitable[T]], Callable[P, T]],
+) -> Callable[P, Awaitable[T]]:
     """
     convert action into async-action
 
@@ -69,10 +84,19 @@ def wrap_async(action: Action) -> AsyncAction:
     if inspect.iscoroutinefunction(action):
         return action
 
+    action = cast(Callable[P, T], action)
     @functools.wraps(action)
-    async def inner(*args, **kwargs):
-        await asyncio.to_thread(action, *args, **kwargs)
+    async def inner(*args, **kwargs) -> T:
+        return await to_thread(action, *args, **kwargs)
     return inner
+
+def call_async(co: Union[Awaitable[T], T], loop: asyncio.AbstractEventLoop) -> T:
+    """
+    ensure co-routine is run to completion if co-routine
+    """
+    if inspect.isawaitable(co):
+        return loop.run_until_complete(co)
+    return co
 
 @functools.lru_cache(maxsize=None)
 def get_signature(callable: Callable) -> Inspected:

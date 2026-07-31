@@ -2,26 +2,54 @@
 CLI Action Context
 """
 import sys
+import asyncio
+import contextlib
 from contextvars import ContextVar
-from contextlib import contextmanager
+from types import TracebackType
 from typing import (
-    Any, BinaryIO, Dict, Generator, List, Literal, Optional, TextIO,
-    Type, Union, cast, overload)
+    Any, AsyncGenerator, Awaitable, BinaryIO, Callable, Dict, Generator, List, Literal,
+    Optional, TextIO, Type, TypeVar, Union, cast, overload)
 from typing_extensions import Annotated, get_origin, get_args
 
 from . import T
 from .style import Styling, AnsiTermStyle
 
 #** Variables **#
-__all__ = ['AnyIO', 'MISSING', 'Context', 'new_context', 'get_current_context']
+__all__ = [
+    'AnyIO',
+    'MISSING',
+
+    'new_context',
+    'new_context_async',
+    'get_current_context',
+
+    'Context',
+]
+
+SyncCtx  = TypeVar('SyncCtx', bound=contextlib.AbstractContextManager)
+AsyncCtx = TypeVar('AsyncCtx', bound=contextlib.AbstractAsyncContextManager)
 
 AnyIO = Union[TextIO, BinaryIO]
+
+SyncExitFunc = Callable[[
+    Optional[Type[Exception]],
+    Optional[Exception],
+    Optional[TracebackType],
+], Optional[bool]]
+
+AsyncExitFunc = Callable[[
+    Optional[Type[Exception]],
+    Optional[Exception],
+    Optional[TracebackType],
+], Awaitable[Optional[bool]]]
+
+ExitFunc = Union[AsyncExitFunc, SyncExitFunc]
 
 context_stack: ContextVar[List['Context']] = ContextVar('context_stack')
 
 #** Functions **#
 
-@contextmanager
+@contextlib.contextmanager
 def new_context(
     parsed: 'ParsedCmd', **kwargs) -> Generator['Context', None, None]:
     """
@@ -31,6 +59,26 @@ def new_context(
     token   = context_stack.set([context])
     try:
         yield context
+        context.close(None, None, None)
+    except Exception as e:
+        context.close(e.__class__, e, e.__traceback__)
+    finally:
+        context_stack.reset(token)
+
+@contextlib.asynccontextmanager
+async def new_context_async(
+    parsed: 'ParsedCmd', **kwargs) -> AsyncGenerator['Context', None]:
+    """
+    asyncly start new context object stack for the current cli job
+    """
+    kwargs.setdefault('loop', asyncio.get_running_loop())
+    context = Context(parsed, **kwargs)
+    token   = context_stack.set([context])
+    try:
+        yield context
+        await context.close_async(None, None, None)
+    except Exception as e:
+        await context.close_async(e.__class__, e, e.__traceback__)
     finally:
         context_stack.reset(token)
 
@@ -76,12 +124,15 @@ class Context:
     CLI Command Action Runtime Context
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
-        'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help', 'standalone_mode')
+        'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help',
+        'standalone_mode', 'loop', 'closed', 'closers')
 
     extra:   Dict[str, Any]
     stdout:  AnyIO
     stderr:  AnyIO
     styling: Styling
+    closers: List[ExitFunc]
+    loop:    asyncio.AbstractEventLoop
 
     def __init__(self,
         parsed:  'ParsedCmd',
@@ -92,7 +143,9 @@ class Context:
         suggest: Optional['SuggestorCLS'] = None,
         styling: Optional[Styling]        = None,
         extra:   Optional[Dict[str, Any]] = None,
-        standalone_mode: bool             = True,
+
+        loop:            Optional[asyncio.AbstractEventLoop] = None,
+        standalone_mode: bool                                = True,
     ):
         """
         :param parsed:          parsed command contents
@@ -104,6 +157,7 @@ class Context:
         :param styling:         format styling object
         :param extra:           extra data
         :param standalone_mode: label if actions are running in standalone
+        :param loop:            event-loop to use for action/callback processing
         """
         self.parsed  = parsed
         self.command = parsed.source
@@ -117,6 +171,9 @@ class Context:
         self.styling = styling or AnsiTermStyle()
         self.help    = help or Help(styling)
         self.standalone_mode = standalone_mode
+        self.loop    = loop or (parent.loop if parent else asyncio.new_event_loop())
+        self.closed  = False
+        self.closers = []
 
     def __repr__(self) -> str:
         return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
@@ -152,6 +209,58 @@ class Context:
         force exit command execution early
         """
         raise Exit(exit_code)
+
+    def on_close(self, closer: ExitFunc):
+        """
+        add exit function to be triggered on cleanup (LIFO queue)
+        """
+        self.closers.insert(0, closer)
+
+    def with_resource(self, manager: SyncCtx) -> SyncCtx:
+        """
+        bind context-manager to context to ensure closing on exit
+        """
+        manager.__enter__()
+        self.on_close(manager.__exit__)
+        return manager
+
+    async def with_async_resource(self, manager: AsyncCtx) -> AsyncCtx:
+        """
+        bind async context-manager to context to ensure closing on exit
+        """
+        await manager.__aenter__()
+        self.on_close(manager.__aexit__)
+        return manager
+
+    def close(self,
+        exc_type: Optional[Type[Exception]],
+        exc_val:  Optional[Exception],
+        exc_tb:   Optional[TracebackType],
+    ):
+        """
+        run all configured closers
+        """
+        if self.closed:
+            return
+        for closer in self.closers:
+            co = closer(exc_type, exc_val, exc_tb)
+            call_async(co, loop=self.loop)
+        self.closed = True
+
+    async def close_async(self,
+        exc_type: Optional[Type[Exception]],
+        exc_val:  Optional[Exception],
+        exc_tb:   Optional[TracebackType],
+    ):
+        """
+        run all configured closers asyncly
+        """
+        if self.closed:
+            return
+        for closer in self.closers:
+            func = wrap_async(closer)
+            await func(exc_type, exc_val, exc_tb)
+        self.closed = True
 
     def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
         """
@@ -229,6 +338,10 @@ class Context:
             styling=self.styling,
             help=self.help)
         context_stack.get().append(context)
+
+        loop  = asyncio._get_running_loop()
+        close = context.close if loop is None else context.close_async
+        self.on_close(close)
         return context
 
 #** Imports **#
@@ -237,3 +350,4 @@ from .help import Help
 from .errors import Exit
 from .parser import ParsedCmd
 from .suggest import Suggestor, SuggestorCLS
+from .wraps import call_async, wrap_async
