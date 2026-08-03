@@ -43,7 +43,7 @@ class Command:
     __slots__ = (
         'name', 'about', 'version', 'authors', 'category', 'hidden',
         'suggest', 'args', 'flags', 'commands', 'aliases', 'action',
-        'invoke_without_command',)
+        'chain', 'repeat', 'invoke_without_command',)
 
     def __init__(self,
         name:                   str,
@@ -58,6 +58,8 @@ class Command:
         commands:               Optional[Commands]  = None,
         aliases:                Optional[List[str]] = None,
         action:                 Optional[Action]    = None,
+        chain:                  bool                = False,
+        repeat:                 bool                = False,
         invoke_without_command: bool                = False,
     ):
         """
@@ -73,6 +75,8 @@ class Command:
         :param commands:               configured sub-commands
         :param aliases:                aliases of the command
         :param action:                 function to call on command
+        :param chain:                  allow chaining subcommands
+        :param repeat:                 allow repeating the same command (in chain)
         :param invoke_without_command: allow command to run without subcommand
         """
         self.name                   = name
@@ -87,6 +91,8 @@ class Command:
         self.commands               = commands or []
         self.aliases                = aliases or []
         self.action                 = action
+        self.chain                  = chain
+        self.repeat                 = repeat
         self.invoke_without_command = invoke_without_command
 
     def __repr__(self) -> str:
@@ -170,6 +176,8 @@ class Command:
         about:    Optional[str] = None,
         category: Optional[str] = None,
         hidden:   bool          = False,
+        chain:    bool          = False,
+        repeat:   bool          = False,
         cls:      None          = None,
     ) -> Callable[[Callable], 'Command']:
         ...
@@ -180,6 +188,8 @@ class Command:
         about:    Optional[str] = None,
         category: Optional[str] = None,
         hidden:   bool          = False,
+        chain:    bool          = False,
+        repeat:   bool          = False,
         *, cls: Type[C],
     ) -> Callable[[Callable], C]:
         ...
@@ -193,6 +203,8 @@ class Command:
         about:    Optional[str]            = None,
         category: Optional[str]            = None,
         hidden:   bool                     = False,
+        chain:    bool                     = False,
+        repeat:   bool                     = False,
         cls:      Optional[Type[C]]        = None,
     ) -> Union[Callable[[Action], 'Command'], C, 'Command']:
         """
@@ -202,6 +214,8 @@ class Command:
         :param about:    description of command
         :param category: category linked to command
         :param hidden:   hide this command if true
+        :param chain:    allow chaining subcommands
+        :param repeat:   allow repeating the same command (in chain)
         :param cls:      command subclass type
         """
         cname = name if isinstance(name, str) else None
@@ -211,6 +225,8 @@ class Command:
             cmd.about    = about or cmd.about
             cmd.category = category or cmd.category
             cmd.hidden   = hidden or cmd.hidden
+            cmd.chain    = chain or cmd.chain
+            cmd.repeat   = repeat or cmd.repeat
             self.commands.append(cmd)
             return cmd
         return wrapper(name) if callable(name) else wrapper
@@ -322,9 +338,10 @@ class Command:
                 func = wrap_ctx(act)
                 co   = func(context)
                 call_async(co, loop=context.loop)
-        for parsed in context.parsed.commands.values():
-            context = context.stack(parsed)
-            context.command.run_with(context)
+        for plist in context.parsed.commands.values():
+            for parsed in plist:
+                context = context.stack(parsed)
+                context.command.run_with(context)
 
     async def run_with_async(self,
         context: 'Context', action: Optional[AsyncAction] = None):
@@ -339,9 +356,10 @@ class Command:
             if self._check_run(context):
                 async_act = wrap_async(act)
                 await wrap_ctx(async_act)(context)
-        for parsed in context.parsed.commands.values():
-            context = context.stack(parsed)
-            await context.command.run_with_async(context)
+        for plist in context.parsed.commands.values():
+            for parsed in plist:
+                context = context.stack(parsed)
+                await context.command.run_with_async(context)
 
     @overload
     def run(self,

@@ -16,6 +16,7 @@ __all__ = [
 
     'HelpError',
     'CommandRequired',
+    'NoCommandChain',
     'InvalidCommand',
     'Missing',
     'MissingValue',
@@ -111,6 +112,20 @@ class CommandRequired(UsageError):
             + help.newline \
             + help.indent \
             + f'[subcommands: {", ".join(cmds)}]'
+
+class NoCommandChain(UsageError):
+    def __init__(self, ctx: ParseCtx, commands: List[Command]):
+        super().__init__(ctx, commands)
+        self.commands = commands
+        self.message  = 'command chaining is not allowed'
+
+    def format_message(self, help: Help):
+        cmds = [help.styling.wrap_color('green', c.name) for c in self.commands]
+        name = help.styling.wrap_color('yellow', repr(self.ctx.command.name))
+        return f'{name} {self.message}' \
+            + help.newline \
+            + help.indent \
+            + f'[used: {", ".join(cmds)}]'
 
 class Missing(UsageError):
     def __init__(self, ctx: ParseCtx, missing: List[Union[Arg, Flag]]):

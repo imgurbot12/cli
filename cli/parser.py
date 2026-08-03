@@ -58,7 +58,8 @@ def index_commands(
             if command.name != arg and arg not in command.aliases:
                 continue
             indexes.append((arg_idx, command))
-            commands.pop(cmd_idx)
+            if not command.repeat:
+                commands.pop(cmd_idx)
             break
     return indexes
 
@@ -70,18 +71,19 @@ class ParsedCmd(NamedTuple):
     """
     source:   Command
     args:     Dict[str, Any]
-    commands: Dict[str, 'ParsedCmd']
+    commands: Dict[str, List['ParsedCmd']]
     flags:    Dict[str, Any]
 
 class ParseCtx:
     """
     Parsing shared context object
     """
-    __slots__ = ('path', 'missing', 'missing_v', 'invalid', 'unexpected')
+    __slots__ = ('path', 'missing', 'missing_v', 'invalid', 'unexpected', 'disallowed')
 
     path:       List[Command]
     missing:    List[Union[Arg, Flag, Command]]
     missing_v:  List[Flag]
+    disallowed: List[Command]
     invalid:    Dict[Union[Arg, Flag], str]
     unexpected: List[str]
 
@@ -90,6 +92,7 @@ class ParseCtx:
         self.missing    = []
         self.missing_v  = []
         self.invalid    = {}
+        self.disallowed = []
         self.unexpected = []
 
     def __repr__(self) -> str:
@@ -135,6 +138,12 @@ class ParseCtx:
         """
         self.missing_v.extend(missing)
 
+    def add_disallowed(self, commands: List[Command]):
+        """
+        log disallowed command chain
+        """
+        self.disallowed.extend(commands)
+
     def add_invalid(self, invalid: Union[Arg, Flag], value: str):
         """
         log an invalid argument/flag value during parsing
@@ -155,6 +164,8 @@ class ParseCtx:
             raise Unexpected(self, self.unexpected)
         if self.invalid:
             raise Invalid(self, self.invalid)
+        if self.disallowed:
+            raise NoCommandChain(self, self.disallowed)
         if self.missing_v:
             raise MissingValue(self, self.missing_v)
         if self.missing:
@@ -320,7 +331,7 @@ class Parser:
         return parsed
 
     def split_commands(self, ctx: ParseCtx, commands: List[Command],
-        args: List[str]) -> Dict[str, ParsedCmd]:
+        args: List[str]) -> Dict[str, List[ParsedCmd]]:
         """
         split sub-commands from the raw argument list
 
@@ -331,7 +342,7 @@ class Parser:
         """
         indexes = index_commands(commands, args)
 
-        parsed = []
+        parsed = OrderedDict()
         indexes.reverse()
         for idx, command in indexes:
             c_ctx      = ctx.stack(command)
@@ -340,14 +351,18 @@ class Parser:
             c_flags    = self.split_flags(c_ctx, command.flags, c_args)
             c_params   = self.split_args(c_ctx, command.args, c_args)
             c_ctx.finalize()
-            parsed.append((command.name, ParsedCmd(command,
-                c_params, c_commands, c_flags)))
+            parsed.setdefault(command.name, [])
+            parsed[command.name].insert(0,
+                ParsedCmd(command, c_params, c_commands, c_flags))
 
-        parsed.reverse()
         if not parsed and commands \
             and not ctx.command.invoke_without_command:
             ctx.add_missing(ctx.command)
-        return OrderedDict(parsed)
+
+        if len(parsed) > 1 and not ctx.command.chain:
+            ctx.add_disallowed([c for c in commands if c.name in parsed])
+
+        return OrderedDict(reversed(parsed.items()))
 
     def split_help(self, ctx: ParseCtx, args: List[str]):
         """
@@ -400,5 +415,5 @@ class Parser:
 #** Imports **#
 from .errors import (
     CliError, CommandRequired, HelpError, Invalid, InvalidCommand, Missing,
-    MissingValue, Unexpected)
+    MissingValue, NoCommandChain, Unexpected)
 from .suggest import autocomplete_cmd

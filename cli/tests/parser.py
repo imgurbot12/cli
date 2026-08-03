@@ -248,18 +248,20 @@ class ParserTests(TestCase):
         """
         result = self.parse(['echo', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
+        self.assertEqual(len(echo), 1)
         self.assertDictEqual(result.args, {})
         self.assertDictEqual(result.flags, DEFAULT_OPTS)
         self.assertEqual(len(result.commands), 1)
-        self.assertDictEqual(echo.flags, {'dry': True, 'file': Path('file')})
+        self.assertDictEqual(echo[0].flags, {'dry': True, 'file': Path('file')})
 
         result = self.parse(['echo', '--', '-d', '-f', 'file', 'test'])
         echo   = result.commands['echo']
+        self.assertEqual(len(echo), 1)
         self.assertDictEqual(result.args, {})
         self.assertDictEqual(result.flags, DEFAULT_OPTS)
         self.assertEqual(len(result.commands), 1)
-        self.assertDictEqual(echo.args, {'test': ['-d', '-f', 'file', 'test']})
-        self.assertDictEqual(echo.flags, {'dry': False, 'file': None})
+        self.assertDictEqual(echo[0].args, {'test': ['-d', '-f', 'file', 'test']})
+        self.assertDictEqual(echo[0].flags, {'dry': False, 'file': None})
 
     def test_subsub_command(self):
         """
@@ -269,14 +271,19 @@ class ParserTests(TestCase):
         for args in args:
             with self.subTest(args):
                 result = self.parse(args)
-                do     = result.commands['do']
+                dos    = result.commands['do']
+                do     = dos[0]
+                runs   = do.commands['run']
+                run    = runs[0]
+                self.assertEqual(len(dos), 1)
+                self.assertEqual(len(runs), 1)
                 self.assertDictEqual(result.args, {})
                 self.assertDictEqual(result.flags, DEFAULT_OPTS)
                 self.assertDictEqual(do.args, {})
                 self.assertDictEqual(do.flags, {'kill': False})
-                self.assertDictEqual(do.commands['run'].args, {'dist1': 5, 'dist2': 42})
-                self.assertDictEqual(do.commands['run'].flags, {'km': False})
-                self.assertDictEqual(do.commands['run'].commands, {})
+                self.assertDictEqual(run.args, {'dist1': 5, 'dist2': 42})
+                self.assertDictEqual(run.flags, {'km': False})
+                self.assertDictEqual(run.commands, {})
 
 class ParserTestsV1(ParserTests):
     __test__ = True

@@ -7,8 +7,8 @@ import contextlib
 from contextvars import ContextVar
 from types import TracebackType
 from typing import (
-    Any, AsyncGenerator, Awaitable, BinaryIO, Callable, Dict, Generator, List, Literal,
-    Optional, TextIO, Type, TypeVar, Union, cast, overload)
+    Any, AsyncGenerator, Awaitable, BinaryIO, Callable, Dict, Generator,
+    List, Literal, Optional, TextIO, Type, TypeVar, Union, cast, overload)
 from typing_extensions import Annotated, get_origin, get_args
 
 from . import T
@@ -63,6 +63,7 @@ def new_context(
         context.close(None, None, None)
     except Exception as e:
         context.close(e.__class__, e, e.__traceback__)
+        raise e
     finally:
         context_stack.reset(token)
         if close:
@@ -82,6 +83,7 @@ async def new_context_async(
         await context.close_async(None, None, None)
     except Exception as e:
         await context.close_async(e.__class__, e, e.__traceback__)
+        raise e
     finally:
         context_stack.reset(token)
 
