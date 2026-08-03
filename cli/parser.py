@@ -342,7 +342,7 @@ class Parser:
         """
         indexes = index_commands(commands, args)
 
-        parsed = OrderedDict()
+        parsed: Dict[str, List[ParsedCmd]] = OrderedDict()
         indexes.reverse()
         for idx, command in indexes:
             c_ctx      = ctx.stack(command)

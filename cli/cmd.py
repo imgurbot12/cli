@@ -1,8 +1,9 @@
 """
 CLI Command Implementation
 """
-import asyncio
 import sys
+import asyncio
+from collections import UserList
 from typing import (
     Any, Awaitable, Callable, Dict, List, Literal, Optional, Type,
     TypeVar, Union, overload)
@@ -18,8 +19,8 @@ __all__ = ['Action', 'Command', 'Commands']
 C           = TypeVar('C', bound='Command')
 Commands    = List['Command']
 
-SyncAction  = Callable[..., None]
-AsyncAction = Callable[..., Awaitable[None]]
+SyncAction  = Callable[..., Any]
+AsyncAction = Callable[..., Awaitable[Any]]
 Action      = Union[SyncAction, AsyncAction]
 
 RunArgs = Optional[List[str]]
@@ -35,6 +36,41 @@ class RunKwargs(TypedDict, total=False):
     styling: Styling
     extra:   Dict[str, Any]
     loop:    asyncio.AbstractEventLoop
+
+class ResultList(UserList):
+    """
+    Special list subtype to denote a result collection
+    """
+
+class Results:
+    """
+    Command Return Result Accumulator
+    """
+    __slots__ = ('results', )
+
+    def __init__(self):
+        self.results = ResultList()
+
+    def add_result(self, result: Any):
+        """
+        add a new result to the collection
+        """
+        if result is None:
+            return
+        if isinstance(result, ResultList):
+            self.results.extend(result)
+        else:
+            self.results.append(result)
+
+    def result(self) -> Any:
+        """
+        return finalized result from collection
+        """
+        if not self.results:
+            return
+        if len(self.results) == 1:
+            return self.results[0]
+        return self.results
 
 class Command:
     """
@@ -113,7 +149,7 @@ class Command:
         *,
         standalone_mode: Literal[False] = False,
         **kwargs: Unpack[RunKwargs]
-    ) -> None:
+    ) -> Any:
         ...
 
     def __call__(self,
@@ -332,16 +368,20 @@ class Command:
         :param context: command runtime context
         :param action:  command action override
         """
-        act = action or self.action
+        act    = action or self.action
+        result = Results()
         if act is not None:
             if self._check_run(context):
                 func = wrap_ctx(act)
                 co   = func(context)
-                call_async(co, loop=context.loop)
+                ret  = call_async(co, loop=context.loop)
+                result.add_result(ret)
         for plist in context.parsed.commands.values():
             for parsed in plist:
                 context = context.stack(parsed)
-                context.command.run_with(context)
+                ret     = context.command.run_with(context)
+                result.add_result(ret)
+        return result.result()
 
     async def run_with_async(self,
         context: 'Context', action: Optional[AsyncAction] = None):
@@ -351,15 +391,19 @@ class Command:
         :param context: command runtime context
         :param action:  command action override
         """
-        act = action or self.action
+        act    = action or self.action
+        result = Results()
         if act is not None:
             if self._check_run(context):
                 async_act = wrap_async(act)
-                await wrap_ctx(async_act)(context)
+                ret       = await wrap_ctx(async_act)(context)
+                result.add_result(ret)
         for plist in context.parsed.commands.values():
             for parsed in plist:
                 context = context.stack(parsed)
-                await context.command.run_with_async(context)
+                ret     = await context.command.run_with_async(context)
+                result.add_result(ret)
+        return result.result()
 
     @overload
     def run(self,
@@ -376,7 +420,7 @@ class Command:
         *,
         standalone_mode: Literal[False] = False,
         **kwargs: Unpack[RunKwargs]
-    ) -> None:
+    ) -> Any:
         ...
 
     def run(self,
@@ -384,7 +428,7 @@ class Command:
         *,
         standalone_mode: bool = True,
         **kwargs: Unpack[RunKwargs]
-    ):
+    ) -> Any:
         """
         parse the given arguments and run the relevant command actions
 
@@ -392,30 +436,32 @@ class Command:
         :param standalone_mode: exit after completion if true
         """
         code   = 0
-        result = self.parse(args, standalone_mode=standalone_mode, **kwargs)
-        with new_context(result,
+        parsed = self.parse(args, standalone_mode=standalone_mode, **kwargs)
+        result = None
+        with new_context(parsed,
             standalone_mode=standalone_mode, **kwargs) as context:
             try:
-                self.run_with(context)
+                result = self.run_with(context)
             except Exit as err:
                 if not standalone_mode:
                     raise err
                 code = err.exit_code
         if standalone_mode:
             sys.exit(code)
+        return result
 
     async def run_async(self,
-        args: RunArgs = None, **kwargs: Unpack[RunKwargs]) -> None:
+        args: RunArgs = None, **kwargs: Unpack[RunKwargs]) -> Any:
         """
         parse the given arguments and run the relevant command actions asyncly
 
         :param args:            arguments to parse
         :param standalone_mode: exit after completion if true
         """
-        result = self.parse(args, standalone_mode=False, **kwargs)
-        async with new_context_async(result,
+        parsed = self.parse(args, standalone_mode=False, **kwargs)
+        async with new_context_async(parsed,
             standalone_mode=False, **kwargs) as context:
-            await self.run_with_async(context)
+            return await self.run_with_async(context)
 
 #** Imports **#
 from .context import AnyIO, Context, new_context, new_context_async

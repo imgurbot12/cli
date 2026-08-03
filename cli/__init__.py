@@ -34,9 +34,8 @@ from typing_extensions import Annotated, get_args, get_origin, get_type_hints
 #  - repeat configures whether command can be chained on itself
 #  - chain configures if subcommands are allowed in combination.
 
-#TODO: allow returning values from actions (when standalone is disabled)
+#DONE: allow returning values from actions (when standalone is disabled)
 
-#TODO: return values from actions
 #TODO: give indexing another shot (but count down rather than up)
 #TODO: errors should be more precisce -> double flag, extra arg, etc...
 
