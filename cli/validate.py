@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import Any, Callable, Dict, Optional, Type, Union
 from typing_extensions import Annotated
 
+from .parser import ParseCtx
 from .suggest import Suggest
 
 #** Variables **#
@@ -32,7 +33,8 @@ __all__ = [
     'ExistingFile',
 ]
 
-ValidatorFunc = Callable[[Any], Any]
+ValidatorFunc  = Callable[..., Any]
+InnerValidator = Callable[[ParseCtx, Any], Any]
 
 #: valid logging levels
 LOG_LEVELS = {

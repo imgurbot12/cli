@@ -119,6 +119,17 @@ def typecheck(value: Any, typedef: Type) -> bool:
         typedef = args[0]
     return isinstance(value, typedef)
 
+def get_dict(dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
+    """
+    retrieve a value from a dictionarry and validate its type if given
+    """
+    value = dict[name]
+    if ctype is not None and not typecheck(value, ctype):
+        t1 = type(value).__name__
+        t2 = ctype.__name__
+        raise TypeError(f'{name!r} ({t1}) is not a {t2}')
+    return value
+
 #** Classes **#
 
 class MISSING:
@@ -267,17 +278,6 @@ class Context:
             await func(exc_type, exc_val, exc_tb)
         self.closed = True
 
-    def _get(self, dict: Dict[str, Any], name: str, ctype: Optional[Type[T]]) -> T:
-        """
-        retrieve a value from a dictionarry and validate its type if given
-        """
-        value = dict[name]
-        if ctype is not None and not typecheck(value, ctype):
-            t1 = type(value).__name__
-            t2 = ctype.__name__
-            raise TypeError(f'{name!r} ({t1}) is not a {t2}')
-        return value
-
     def get(self, name: str,
         ctype: Optional[Type[T]] = None, default: Any = MISSING) -> T:
         """
@@ -310,7 +310,7 @@ class Context:
         :param name:  name of argument
         :param ctype: type annotation/validation
         """
-        return self._get(self.args, name, ctype)
+        return get_dict(self.args, name, ctype)
 
     def get_flag(self, name: str, ctype: Type[T]) -> T:
         """
@@ -319,7 +319,7 @@ class Context:
         :param name:  name of flag/option
         :param ctype: type annotation/validation
         """
-        return self._get(self.flags, name, ctype)
+        return get_dict(self.flags, name, ctype)
 
     def get_extra(self, name: str, ctype: Type[T]) -> T:
         """
@@ -328,7 +328,7 @@ class Context:
         :param name:  name of extra value
         :param ctype: type annotation/validation
         """
-        return self._get(self.extra, name, ctype)
+        return get_dict(self.extra, name, ctype)
 
     def stack(self, parsed: 'ParsedCmd') -> 'Context':
         """

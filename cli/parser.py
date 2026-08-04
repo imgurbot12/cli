@@ -9,7 +9,7 @@ from . import T
 from .arg import Arg
 from .cmd import Command
 from .flag import Flag
-from .context import MISSING
+from .context import MISSING, get_dict
 from .help import Help
 
 #** Variables **#
@@ -78,17 +78,21 @@ class ParseCtx:
     """
     Parsing shared context object
     """
-    __slots__ = ('path', 'missing', 'missing_v', 'invalid', 'unexpected', 'disallowed')
+    __slots__ = ('path', 'extra',
+        'missing', 'missing_v', 'invalid', 'unexpected', 'disallowed')
 
     path:       List[Command]
+    extra:      Dict[str, Any]
+
     missing:    List[Union[Arg, Flag, Command]]
     missing_v:  List[Flag]
     disallowed: List[Command]
     invalid:    Dict[Union[Arg, Flag], str]
     unexpected: List[str]
 
-    def __init__(self, path: List[Command]):
+    def __init__(self, path: List[Command], extra: Dict[str, Any]):
         self.path       = path
+        self.extra      = extra
         self.missing    = []
         self.missing_v  = []
         self.invalid    = {}
@@ -96,7 +100,7 @@ class ParseCtx:
         self.unexpected = []
 
     def __repr__(self) -> str:
-        return f'Context(path={[c.name for c in self.path]})'
+        return f'ParseCtx(path={[c.name for c in self.path]})'
 
     @property
     def command(self) -> Command:
@@ -109,7 +113,7 @@ class ParseCtx:
         """
         generate new child context with next command
         """
-        return self.__class__([*self.path, command])
+        return self.__class__([*self.path, command], self.extra)
 
     def splice_args(self, array: List[T],
         index: int, length: Optional[int] = None) -> List[T]:
@@ -125,6 +129,18 @@ class ParseCtx:
         splice = array[index:end]
         array[index:end] = []
         return splice
+
+    def get_extra(self, name: str, ctype: Type[T]) -> T:
+        """
+        retrieve extra value of a specific name and validate type
+
+        :param name:  name of extra value
+        :param ctype: type annotation/validation
+        """
+        if name not in self.extra:
+            if issubclass(ctype, self.__class__):
+                return cast(T, self)
+        return get_dict(self.extra, name, ctype)
 
     def add_missing(self, *missing: Union[Arg, Flag, Command]):
         """
@@ -224,9 +240,10 @@ class Parser:
         if error_flags and isinstance(value, str) and value.startswith('-'):
             return ctx.add_unexpected(value)
 
-        for validator in arg.validators:
+        for raw_validator in arg.validators:
+            validator = wrap_validator(raw_validator)
             try:
-                value = validator(value)
+                value = validator(ctx, value)
             except ValueError as e:
                 return ctx.add_invalid(arg, e.args[0])
         return value
@@ -251,9 +268,10 @@ class Parser:
             if value is None:
                 parsed.append(flag.default if flag._requires_value() else True)
                 continue
-            for validator in flag.validators:
+            for raw_validator in flag.validators:
+                validator = wrap_validator(raw_validator)
                 try:
-                    value = validator(value)
+                    value = validator(ctx, value)
                 except ValueError as e:
                     return ctx.add_invalid(flag, e.args[0])
             parsed.insert(0, value)
@@ -389,7 +407,8 @@ class Parser:
                 cmd = vars[item]
             raise HelpError(ctx, cmd)
 
-    def parse(self, args: List[str]) -> ParsedCmd:
+    def parse(self, args: List[str],
+        extra: Optional[Dict[str, Any]] = None) -> ParsedCmd:
         """
         parse the specified arguments against the command defintion
 
@@ -398,7 +417,7 @@ class Parser:
         """
         args     = args.copy()
         nargs    = len(args)
-        ctx      = ParseCtx([self.command])
+        ctx      = ParseCtx([self.command], extra or {})
         self.split_help(ctx, args)
 
         try:
@@ -417,3 +436,4 @@ from .errors import (
     CliError, CommandRequired, HelpError, Invalid, InvalidCommand, Missing,
     MissingValue, NoCommandChain, Unexpected)
 from .suggest import autocomplete_cmd
+from .wraps import wrap_validator

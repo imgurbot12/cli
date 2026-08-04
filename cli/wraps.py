@@ -15,6 +15,7 @@ from .arg import Arg
 from .flag import Flag
 from .cmd import Command
 from .context import Context
+from .parser import ParseCtx
 
 #** Variables **#
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     'parse_doc',
     'into_command',
     'wrap_ctx',
+    'wrap_validator',
 ]
 
 P = ParamSpec('P')
@@ -233,6 +235,7 @@ def into_command(callable: Callable, cls: Type[Command] = Command) -> Command:
         action=callable,
     )
 
+@functools.lru_cache()
 def wrap_ctx(callable: Callable[..., R]) -> Callable[[Context], R]:
     """
     wrap function in handler that unwraps the context into its relevant args
@@ -279,6 +282,47 @@ def wrap_ctx(callable: Callable[..., R]) -> Callable[[Context], R]:
             for key, value in ctx.extra.items():
                 if key not in used and key not in kwargs:
                     kwargs[key] = value
+        return callable(*args, **kwargs)
+
+    setattr(inner, WRAP_CTX_ATTR, True)
+    return inner
+
+@functools.lru_cache()
+def wrap_validator(callable: Callable[..., R]) -> Callable[[ParseCtx, Any], R]:
+    """
+    wrap validator function that unwraps the `ParseCtx` into its relevant args
+
+    :param callable: original function to wrap
+    :return:         wrapped function
+    """
+    if hasattr(callable, WRAP_CTX_ATTR):
+        return callable
+
+    signature = get_signature(callable)
+    def inner(ctx: ParseCtx, validate: Any) -> R:
+        used = set()
+        args = []
+        kwargs = {}
+        try:
+            for arg in signature.args[:-1]:
+                cast  = signature.typehints[arg]
+                value = ctx.get_extra(arg, cast)
+                used.add(arg)
+                args.append(value)
+            for kwarg in signature.kwargs:
+                cast  = signature.typehints[kwarg]
+                value = ctx.get_extra(kwarg, cast)
+                used.add(kwarg)
+                kwargs[kwarg] = value
+            if signature.kw_splat is not None:
+                for key, value in ctx.extra.items():
+                    if key not in used and key not in kwargs:
+                        kwargs[key] = value
+        except KeyError as e:
+            name = callable.__name__
+            arg  = e.args[0]
+            raise TypeError(f'{name} is missing argument {arg!r}') from None
+        args.append(validate)
         return callable(*args, **kwargs)
 
     setattr(inner, WRAP_CTX_ATTR, True)

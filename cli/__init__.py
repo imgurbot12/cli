@@ -67,6 +67,7 @@ __all__ = [
 
     'Help',
     'Parser',
+    'ParseCtx',
     'ParsedCmd',
     'Suggestor',
 ]
@@ -123,11 +124,12 @@ def get_suggestor(typedef: Type, suggest: OptSuggest) -> OptSuggest:
     """
     if suggest is not None:
         return suggest
-    if get_origin(typedef) is Annotated:
+    origin = get_origin(typedef)
+    if origin is Annotated:
         for arg in get_args(typedef):
             if isinstance(arg, Suggest):
                 return arg.suggestor
-    if issubclass(typedef, Enum):
+    if origin is None and issubclass(typedef, Enum):
         return suggest_static([opt.value for opt in typedef])
     return None
 
@@ -159,7 +161,7 @@ from .context import Context, get_current_context
 from .errors import CliError
 from .flag import Flag
 from .help import Help
-from .parser import Parser, ParsedCmd
+from .parser import Parser, ParsedCmd, ParseCtx
 from .suggest import Suggest, Suggestor, suggest_static
 from .utils import echo, style, secho, argument, extra, option, command, group
 from .validate import DEFAULT_VALIDATORS, Validate, ValidatorFunc

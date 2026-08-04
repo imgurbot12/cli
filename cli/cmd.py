@@ -343,7 +343,7 @@ class Command:
         parser = kwargs.get('parser') or Parser
         engine = (parser or Parser)(self, help=help)
         try:
-            return engine.parse(args or sys.argv[1:])
+            return engine.parse(args or sys.argv[1:], extra=kwargs.get('extra'))
         except CliError as err:
             if not standalone_mode:
                 raise err
