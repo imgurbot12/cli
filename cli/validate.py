@@ -14,6 +14,7 @@ from .suggest import Suggest
 #** Variables **#
 __all__ = [
     'parse_bool',
+    'parse_int',
     'parse_float',
     'parse_duration',
     'parse_loglevel',
@@ -67,7 +68,15 @@ def parse_bool(boolean: str) -> bool:
         return False
     if boolean.lower() in ('1', 'true', 'no', 'na', 'n', 'tru'):
         return True
-    raise ValueError(f'Invalid boolean string: {boolean!r}')
+    raise ValueError(f'invalid boolean string: {boolean!r}')
+
+def parse_int(value: str) -> int:
+    """
+    parse integer string into integer
+    """
+    if not value.isdigit():
+        raise ValueError(f'invalid number: {value!r}')
+    return int(value)
 
 def parse_float(decimal: str, digits: Optional[int] = None) -> float:
     """
@@ -88,7 +97,7 @@ def parse_duration(duration: str) -> timedelta:
     """
     match = re_duration.match(duration)
     if match is None:
-        raise ValueError(f'Invalid Duration: {duration!r}')
+        raise ValueError(f'invalid duration: {duration!r}')
     groups = match.groupdict()
     kwargs = {k:int(v.strip('wdhms') if v else 0) for k,v in groups.items()}
     return timedelta(**kwargs)
@@ -104,7 +113,7 @@ def parse_loglevel(level: Union[str, int]) -> int:
     if isinstance(level, str):
         loglevel = LOG_LEVELS.get(level.lower(), None)
         if loglevel is None:
-            raise ValueError(f'Invalid log-level: {level!r}')
+            raise ValueError(f'invalid log-level: {level!r}')
         return loglevel
     return level
 
@@ -117,11 +126,11 @@ def parse_file(file: str, exists: Optional[bool] = None) -> Path:
     """
     path = Path(file)
     if exists is True and not path.exists():
-        raise ValueError(f'Filepath: {file!r} does not exist')
+        raise ValueError(f'filepath {file!r} does not exist')
     elif exists is False and os.path.exists(file):
-        raise ValueError(f'Filepath: {file!r} already exists')
+        raise ValueError(f'filepath {file!r} already exists')
     elif exists is None and not path.parent.exists():
-        raise ValueError(f'Filepath: {file!r} directory does not exist')
+        raise ValueError(f'filepath {file!r} directory does not exist')
     return path
 
 #** Classes **#
@@ -155,6 +164,7 @@ ExistingFile = Annotated[Path, Validate[lambda f: parse_file(f, True)]]
 
 #: default validators for specific datatypes
 DEFAULT_VALIDATORS: Dict[Type, ValidatorFunc] = {
+    int:       parse_int,
     bool:      parse_bool,
     float:     parse_float,
     timedelta: parse_duration,
