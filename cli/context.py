@@ -218,7 +218,7 @@ class Context:
         """
         generate auto-complete suggestor instance
         """
-        return self.suggest(self.path[0])
+        return self.suggest(self.path[0], self.extra)
 
     def exit(self, exit_code: int = 0):
         """

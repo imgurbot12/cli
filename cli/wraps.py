@@ -14,7 +14,7 @@ from . import T
 from .arg import Arg
 from .flag import Flag
 from .cmd import Command
-from .context import Context
+from .context import Context, get_dict
 from .parser import ParseCtx
 
 #** Variables **#
@@ -30,6 +30,7 @@ __all__ = [
     'into_command',
     'wrap_ctx',
     'wrap_validator',
+    'wrap_suggestor',
 ]
 
 P = ParamSpec('P')
@@ -323,6 +324,47 @@ def wrap_validator(callable: Callable[..., R]) -> Callable[[ParseCtx, Any], R]:
             arg  = e.args[0]
             raise TypeError(f'{name} is missing argument {arg!r}') from None
         args.append(validate)
+        return callable(*args, **kwargs)
+
+    setattr(inner, WRAP_CTX_ATTR, True)
+    return inner
+
+@functools.lru_cache()
+def wrap_suggestor(callable: Callable[..., R]) -> Callable[[dict, str], R]:
+    """
+    wrap suggestor function that unwraps extra args into its relevant args
+
+    :param callable: original function to wrap
+    :return:         wrapped function
+    """
+    if hasattr(callable, WRAP_CTX_ATTR):
+        return callable
+
+    signature = get_signature(callable)
+    def inner(extra: dict, suggest: str) -> R:
+        used = set()
+        args = []
+        kwargs = {}
+        try:
+            for arg in signature.args[:-1]:
+                cast  = signature.typehints[arg]
+                value = get_dict(extra, arg, cast)
+                used.add(arg)
+                args.append(value)
+            for kwarg in signature.kwargs:
+                cast  = signature.typehints[kwarg]
+                value = get_dict(extra, kwarg, cast)
+                used.add(kwarg)
+                kwargs[kwarg] = value
+            if signature.kw_splat is not None:
+                for key, value in extra.items():
+                    if key not in used and key not in kwargs:
+                        kwargs[key] = value
+        except KeyError as e:
+            name = callable.__name__
+            arg  = e.args[0]
+            raise TypeError(f'{name} is missing argument {arg!r}') from None
+        args.append(suggest)
         return callable(*args, **kwargs)
 
     setattr(inner, WRAP_CTX_ATTR, True)

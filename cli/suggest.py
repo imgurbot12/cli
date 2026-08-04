@@ -3,7 +3,7 @@ CLI Autocomplete Suggestion Implementation
 """
 import functools
 from typing import (
-    Any, Iterator, List, Mapping, Optional, Sequence, Set,
+    Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set,
     Tuple, Type, Union)
 
 from . import SuggestFunc
@@ -13,6 +13,7 @@ from .cmd import Command
 from .flag import Flag
 from .parser import index_commands, index_flags
 from .utils import echo
+from .wraps import wrap_suggestor
 
 #** Variables **#
 __all__ = ['SuggestorCLS', 'SuggestFunc', 'Suggest', 'Suggestor', 'suggest_static']
@@ -104,10 +105,11 @@ class Suggestor:
     """
     Auto-Complete Suggestion Generator Implementation
     """
-    __slots__ = ('command', )
+    __slots__ = ('command', 'extra')
 
-    def __init__(self, command: Command):
+    def __init__(self, command: Command, extra: Optional[Dict[str, Any]] = None):
         self.command = command
+        self.extra   = extra or {}
 
     def split_commands(self, args: List[str]) -> Command:
         """
@@ -180,10 +182,11 @@ class Suggestor:
         :param source: source of suggestions
         :param value:  value used to generate suggestions from
         """
-        results   = []
-        suggestor = source.suggestor
-        if callable(suggestor):
-            for item in suggestor(value):
+        results       = []
+        raw_suggestor = source.suggestor
+        if callable(raw_suggestor):
+            suggestor = wrap_suggestor(raw_suggestor)
+            for item in suggestor(self.extra, value):
                 if item not in results:
                     results.append(item)
 
