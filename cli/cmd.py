@@ -460,7 +460,7 @@ class Command:
         """
         parsed = self.parse(args, standalone_mode=False, **kwargs)
         async with new_context_async(parsed,
-            standalone_mode=False, **kwargs) as context:
+            standalone_mode=False, run_async=True, **kwargs) as context:
             return await self.run_with_async(context)
 
 #** Imports **#

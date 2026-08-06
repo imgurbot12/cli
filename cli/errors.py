@@ -1,7 +1,7 @@
 """
 CLI Parser/Runtime Exception Implementations
 """
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import ClassVar, Dict, List, NamedTuple, Optional, Union
 
 from .arg import Arg
 from .cmd import Command
@@ -11,6 +11,9 @@ from .parser import ParseCtx
 
 #** Variables **#
 __all__ = [
+    'InvalidDict',
+    'InvalidRef',
+
     'Exit',
     'CliError',
 
@@ -23,6 +26,8 @@ __all__ = [
     'Invalid',
     'Unexpected',
 ]
+
+InvalidDict = Dict[Union[Arg, Flag], 'InvalidRef']
 
 #** Classes **#
 
@@ -161,8 +166,12 @@ class MissingValue(UsageError):
             + help.newline \
             + help.newline.join(items)
 
+class InvalidRef(NamedTuple):
+    value: str
+    error: str
+
 class Invalid(UsageError):
-    def __init__(self, ctx: ParseCtx, invalid: Dict[Union[Arg, Flag], str]):
+    def __init__(self, ctx: ParseCtx, invalid: InvalidDict):
         super().__init__(ctx, invalid)
         self.invalid = invalid
         self.message = 'invalid arguments present'
@@ -175,7 +184,7 @@ class Invalid(UsageError):
             + help.buffer(
                 items=invalid,
                 left=lambda items: help.usage(self.ctx, items[0]),
-                right=lambda items: help.styling.wrap_color('yellow', items[1]),
+                right=lambda items: help.styling.wrap_color('yellow', items[1].error),
             ).rstrip()
 
 class Unexpected(UsageError):

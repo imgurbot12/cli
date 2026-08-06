@@ -141,7 +141,7 @@ class Context:
     """
     __slots__ = ('parsed', 'command', 'args', 'flags', 'parent',
         'extra', 'stdout', 'stderr', 'suggest', 'styling', 'help',
-        'standalone_mode', 'loop', 'closed', 'closers')
+        'closed', 'closers', 'standalone_mode', 'loop', 'run_async')
 
     extra:   Dict[str, Any]
     stdout:  AnyIO
@@ -162,6 +162,7 @@ class Context:
 
         loop:            Optional[asyncio.AbstractEventLoop] = None,
         standalone_mode: bool                                = True,
+        run_async:       bool                                = False,
     ):
         """
         :param parsed:          parsed command contents
@@ -174,6 +175,7 @@ class Context:
         :param extra:           extra data
         :param standalone_mode: label if actions are running in standalone
         :param loop:            event-loop to use for action/callback processing
+        :param run_async:       label context of runtime as within async loop
         """
         self.parsed  = parsed
         self.command = parsed.source
@@ -186,10 +188,12 @@ class Context:
         self.suggest = suggest or Suggestor
         self.styling = styling or AnsiTermStyle()
         self.help    = help or Help(styling)
-        self.standalone_mode = standalone_mode
-        self.loop    = loop or (parent.loop if parent else asyncio.new_event_loop())
         self.closed  = False
         self.closers = []
+
+        self.standalone_mode = standalone_mode
+        self.run_async = run_async
+        self.loop = loop or (parent.loop if parent else asyncio.new_event_loop())
 
     def __repr__(self) -> str:
         return f'Context(args={self.args}, flags={self.flags}, extra={self.extra})'
@@ -344,8 +348,8 @@ class Context:
             help=self.help)
         context_stack.get().append(context)
 
-        loop  = asyncio._get_running_loop()
-        close = context.close if loop is None else context.close_async
+        close = context.close_async \
+            if self.run_async is None else context.close
         self.on_close(close)
         return context
 

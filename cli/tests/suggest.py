@@ -60,6 +60,7 @@ class SuggestTests(TestCase):
     def test_argument(self):
         """
         """
+        self.assertSuggest(['do', 'run'], [], True)
         self.assertSuggest(['do', 'run'], ['1', '2', '3', '11'])
         self.assertSuggest(['do', 'run', '1'], ['1'], True)
         self.assertSuggest(['do', 'run', '1'], ['42'])

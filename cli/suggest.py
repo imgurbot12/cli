@@ -208,6 +208,8 @@ class Suggestor:
         command = self.split_commands(args)
         if command is not self.command:
             args.pop(0)
+            if not args and partial:
+                return empty()
 
         flag, fmatched = self.split_flags(command.visible_flags(), args)
         if flag is not None:

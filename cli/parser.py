@@ -87,7 +87,7 @@ class ParseCtx:
     missing:    List[Union[Arg, Flag, Command]]
     missing_v:  List[Flag]
     disallowed: List[Command]
-    invalid:    Dict[Union[Arg, Flag], str]
+    invalid:    InvalidDict
     unexpected: List[str]
 
     def __init__(self, path: List[Command], extra: Dict[str, Any]):
@@ -160,11 +160,11 @@ class ParseCtx:
         """
         self.disallowed.extend(commands)
 
-    def add_invalid(self, invalid: Union[Arg, Flag], value: str):
+    def add_invalid(self, invalid: Union[Arg, Flag], value: str, error: str):
         """
         log an invalid argument/flag value during parsing
         """
-        self.invalid[invalid] = value
+        self.invalid[invalid] = InvalidRef(value, error)
 
     def add_unexpected(self, *unexpected: str):
         """
@@ -245,7 +245,8 @@ class Parser:
             try:
                 value = validator(ctx, value)
             except ValueError as e:
-                return ctx.add_invalid(arg, e.args[0])
+                value = cast(str, value)
+                return ctx.add_invalid(arg, value, e.args[0])
         return value
 
     def validate_flag(self, ctx: ParseCtx, flag: Flag, values: FlagValues) -> Any:
@@ -273,7 +274,7 @@ class Parser:
                 try:
                     value = validator(ctx, value)
                 except ValueError as e:
-                    return ctx.add_invalid(flag, e.args[0])
+                    return ctx.add_invalid(flag, value, e.args[0])
             parsed.insert(0, value)
         return parsed if flag.repeat else parsed[0]
 
@@ -433,7 +434,7 @@ class Parser:
 
 #** Imports **#
 from .errors import (
-    CliError, CommandRequired, HelpError, Invalid, InvalidCommand, Missing,
-    MissingValue, NoCommandChain, Unexpected)
+    CliError, CommandRequired, HelpError, Invalid, InvalidCommand,
+    InvalidDict, InvalidRef, Missing, MissingValue, NoCommandChain, Unexpected)
 from .suggest import autocomplete_cmd
 from .wraps import wrap_validator
