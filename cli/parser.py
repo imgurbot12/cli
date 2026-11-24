@@ -87,7 +87,7 @@ class ParseCtx:
     missing:    List[Union[Arg, Flag, Command]]
     missing_v:  List[Flag]
     disallowed: List[Command]
-    invalid:    InvalidDict
+    invalid:    'InvalidDict'
     unexpected: List[str]
 
     def __init__(self, path: List[Command], extra: Dict[str, Any]):
